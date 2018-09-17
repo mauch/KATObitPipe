@@ -2843,7 +2843,6 @@ def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
         printMess(mess, logfile)
         return 1
     SNver = uv.GetHighVer("AIPS SN")
-    print SNver
     # Plot fits?
     if doPlot:
         retCode = EVLAPlotTab(uv, "SN", SNver, err, nplots=6, optype="DELA", \
