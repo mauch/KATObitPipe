@@ -1,0 +1,18 @@
+#################
+#
+# Database of known RFI emitters that can be used to create
+# a static flag list.
+#
+# Columns are:
+# 1: Satellite name
+# 2: Start Freqnency (MHz)
+# 3: End Frequency (MHz)
+#
+
+AFRISTAR	1460.0	1495.0
+GLONASS_L1	1588.0	1615.0
+GLONASS_L2	1232.0	1259.0
+GPS_L1		1555.0	1596.0
+GPS_L2		1207.0	1248.0
+GPS_L5		1150.0	1197.0
+IRIDIUM		1616.0	1630.0
