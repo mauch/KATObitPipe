@@ -43,8 +43,9 @@ parser.add_option("--halfstokes", default=False, action='store_true', help='Only
 parser.add_option("--gzip", default=False, action='store_true', help='Gzip the output UV data')
 parser.add_option("--dropants", help='List of antennas to remove from pbservation.')
 parser.add_option("--blmask", type='float', default=1.e10, help='Baseline length cutoff for the static mask (default apply to all baselines)')
-parser.add_option("--refant", type='str', default=None, help='Reference antenna to use')
-parser.add_option("--XYfix", default=False, action='store_true', help='Target to use to fix the X & Y gains. This will cause the selected target alone'
+parser.add_option("--refant", type='str', default=None, help='Reference antenna to use for calibration')
+parser.add_option("--katdal_refant", type='str', default='', help='Reference antenna to use for activity in katdal')
+parser.add_option("--XYfix", default=False, action='store_true', help='Fix the X & Y gains. This will cause the selected target (via --XTYarg) alone'
  									'to be used for delay and bandpass then subsequent gains to be computed with avgPol=True')
 parser.add_option("--XYtarg", default='1934-638', help='Name of target to use to fix the X & Y gains (default is 1934-638')
 
@@ -57,7 +58,7 @@ if len(katfilenames) == 0:
 katfilenames = get_archive(katfilenames)
 
 kwargs = {}
-for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'XYfix', 'XYtarg']:
+for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'XYfix', 'XYtarg']:
 	if getattr(options,k) != None:
 		kwargs[k] =  getattr(options,k)
 try:
