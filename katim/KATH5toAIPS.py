@@ -754,9 +754,7 @@ def load(dataset, indices, vis, flags):
         Outputs, which must have the correct shape and type
     """
     if isinstance(dataset.vis, DaskLazyIndexer):
-        da.store([katdal.dask_getitem(dataset.vis.dataset, indices),
-                  katdal.dask_getitem(dataset.flags.dataset, indices)],
-                 [vis, flags], lock=False)
+        DaskLazyIndexer.get([dataset.vis, dataset.flags], indices, out=[vis, flags])
     else:
         vis[:] = dataset.vis[indices]
         flags[:] = dataset.flags[indices]
