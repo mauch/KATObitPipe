@@ -106,7 +106,7 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     WriteSUTable (outUV, meta, err)
 
     # Convert data
-    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), stop_w=kwargs.get('stop_w',False), timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False))
+    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), stop_w=kwargs.get('stop_w',False), timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',False))
 
     # Index data
     OErr.PLog(err, OErr.Info, "Indexing data")
@@ -514,7 +514,7 @@ def StopFringes(visData,freqData,cable_delay):
     return outVisData
 
 
-def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=False, timeav=1, flag=False):
+def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=False, timeav=1, flag=False, doweight=False):
     """
     Read KAT HDF data and write Obit UV
 
@@ -612,10 +612,11 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
         for sl in scan_slices:
             tm = katdata.timestamps[sl]
             nint = tm.shape[0]
-            load(katdata, numpy.s_[sl.start:sl.stop, :, :], scan_vs[:nint], scan_fg[:nint])
+            load(katdata, numpy.s_[sl.start:sl.stop, :, :], scan_vs[:nint], scan_wt[:nint], scan_fg[:nint])
             # Make sure we've reset the weights
             wt = scan_wt[:nint]
-            wt[:] = 1.
+            if doweight==False:
+                wt[:] = 1.
             vs = scan_vs[:nint]
             fg = scan_fg[:nint]
             if flag:
@@ -739,7 +740,7 @@ def get_random_parameters(dbiloc, bl, uvws, tm, suid):
 
     return rp
 
-def load(dataset, indices, vis, flags):
+def load(dataset, indices, vis, weights, flags):
     """Load data from lazy indexers into existing storage.
     This is optimised for the MVF v4 case where we can use dask directly
     to eliminate one copy, and also load vis, flags and weights in parallel.
@@ -754,9 +755,10 @@ def load(dataset, indices, vis, flags):
         Outputs, which must have the correct shape and type
     """
     if isinstance(dataset.vis, DaskLazyIndexer):
-        DaskLazyIndexer.get([dataset.vis, dataset.flags], indices, out=[vis, flags])
+        DaskLazyIndexer.get([dataset.vis, dataset.weights, dataset.flags], indices, out=[vis, weights, flags])
     else:
         vis[:] = dataset.vis[indices]
+        weights[:] = dataset.weights[indices]
         flags[:] = dataset.flags[indices]
 
 @numba.jit(nopython=True, parallel=True)

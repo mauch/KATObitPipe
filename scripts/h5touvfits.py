@@ -81,7 +81,7 @@ newuvfits.writeto(filebase+'.uvfits',clobber=True)
 
 uv=OTObit.uvlod(filebase+'.uvfits',0,nam,cls,disk,seq,err)
 
-obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=1.0, stop_w=False)
+obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=1.0, stop_w=False, doweight=True)
 
 uv.Header(err)
 
