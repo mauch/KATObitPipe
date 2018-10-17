@@ -15,11 +15,12 @@ import pyfits
 import warnings
 warnings.simplefilter('ignore')
 
-usage = "%prog [options] h5file"
-description = "Write uvfits file from h5 file"
+usage = "%prog [options] mvffile"
+description = "Write uvfits file from mvfv4 file"
 parser = OptionParser( usage=usage, description=description)
-parser.add_option("--write-flags", action="store_true", default=False, help="Write flags into uvfits file (this negates weights and cannot be undone inside AIPS!!)")
+parser.add_option("--write-flags", action="store_true", default=False, help="Write flags into uvfits file. Writing flags negates weights and cannot be undone inside AIPS!!")
 parser.add_option("--channel-range", default=None, help="Range of frequency channels to keep (zero-based inclusive 'first_chan,last_chan', default is all channels)")
+parser.add_option("--leave-aips", action="store_true", default=False, help="Don't write out uvfits, just leave the result in an aipsdisk")
 (options, args) = parser.parse_args()
 
 h5file=args[0]
@@ -43,10 +44,6 @@ seq = 1
 
 katdata = katdal.open(h5file)
 
-if not options.write_flags:
-    #Reset flags in data file
-    katdata._flags=np.zeros(katdata.shape,dtype=np.uint8)
-
 if options.channel_range:
     channel_range = [int(chan_str) for chan_str in options.channel_range.split(',')]
     first_chan, last_chan = channel_range[0], channel_range[1]
@@ -58,36 +55,24 @@ if options.channel_range:
     print "\nChannel range %s through %s." % (first_chan, last_chan)
     katdata.select(channels=chan_range)
 
-katdata.select(scans='track',targets='1934-638')
+katdata.select(scans='track')
 numchans = len(katdata.channel_freqs)
+nbl = len(np.unique([(cp[0][:-1] + cp[1][:-1]).upper() for cp in katdata.corr_products]))
 
 #Condition the uvfits template
 templatefile=ObitTalkUtil.FITSDir.FITSdisks[fitsdisk]+'MKATTemplate.uvtab.gz'
 
-uvfits = pyfits.open(templatefile)
-#Resize the visibility table
-vistable = uvfits[1].columns
-vistable.del_col('VISIBILITIES')
-newvis = pyfits.Column(name='VISIBILITIES',format='%dE'%(3*4*numchans),dim='(3,4,%d,1,1,1)'%(numchans,),array=np.zeros((1,1,1,numchans,4,3,),dtype=np.float32))
-vistable.add_col(newvis)
-vishdu = pyfits.BinTableHDU.from_columns(vistable)
-for key in uvfits[1].header.keys():
-    if (key not in vishdu.header.keys()) and (key != 'HISTORY'):
-        vishdu.header[key]=uvfits[1].header[key]
-
-newuvfits = pyfits.HDUList([uvfits[0],vishdu,uvfits[2],uvfits[3],uvfits[4],uvfits[5],uvfits[6]])
-
-newuvfits.writeto(filebase+'.uvfits',clobber=True)
+KATH5toAIPS.MakeTemplate(templatefile,filebase+'.uvfits',numchans,nvispio=nbl)
 
 uv=OTObit.uvlod(filebase+'.uvfits',0,nam,cls,disk,seq,err)
 
-obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=1.0, stop_w=False, doweight=True)
+obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=1.0, stop_w=False, doflags=options.write_flags)
 
 uv.Header(err)
+if not options.leave_aips:
+    KATCal.KATUVFITS(uv, filebase+'.uv', 0, err)
 
-KATCal.KATUVFITab(uv, filebase+'.uv', 0, err)
-
-if os.path.exists(os.environ['DA00']): shutil.rmtree(os.environ['DA00'])
-for disk in ObitTalkUtil.AIPSDir.AIPSdisks:
-    if os.path.exists(disk): shutil.rmtree(disk)
+    if os.path.exists(os.environ['DA00']): shutil.rmtree(os.environ['DA00'])
+    for disk in ObitTalkUtil.AIPSDir.AIPSdisks:
+        if os.path.exists(disk): shutil.rmtree(disk)
 

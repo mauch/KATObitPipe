@@ -106,7 +106,7 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     WriteSUTable (outUV, meta, err)
 
     # Convert data
-    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), stop_w=kwargs.get('stop_w',False), timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',False))
+    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), stop_w=kwargs.get('stop_w',False), timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',False), doflags=kwargs.get('doflags',True))
 
     # Index data
     OErr.PLog(err, OErr.Info, "Indexing data")
@@ -514,7 +514,7 @@ def StopFringes(visData,freqData,cable_delay):
     return outVisData
 
 
-def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=False, timeav=1, flag=False, doweight=False):
+def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=False, timeav=1, flag=False, doweight=False, doflags=True):
     """
     Read KAT HDF data and write Obit UV
 
@@ -619,6 +619,8 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
                 wt[:] = 1.
             vs = scan_vs[:nint]
             fg = scan_fg[:nint]
+            if doflags==False:
+                fg[:] = False
             if flag:
                 if static is not None:
                     fg[:, :, blmask] |= static[numpy.newaxis, :, numpy.newaxis]

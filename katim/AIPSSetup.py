@@ -22,7 +22,7 @@ def AIPSSetup(err,configfile=None,scratchdir=None,overwrite=True,aipsdisk='aipsd
         OBIT_DATA    = OBIT_EXEC+'/FITS'
 
     #AIPS user number (arbitrary)
-    user = 1
+    user = 100
 
     # Check if AIPS is defined and use it as the default if it is.
     try:
