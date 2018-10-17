@@ -10,7 +10,7 @@ setup (
     packages = find_packages(),
     scripts = [
         "scripts/KATContPipe.py",
-        "scripts/h5touvfits.py",
+        "scripts/mvftouvfits.py",
 	"scripts/image_obit.py",
         "scripts/KATCalPipe.py",
 	"scripts/KATZenPipe.py"
