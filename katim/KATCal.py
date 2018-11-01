@@ -398,8 +398,7 @@ def KATh5Condition(katdata, caldata, err):
     into AIPS and imaging.
     This conditioning performed is as follows:
         (1) Convert spaces in target name to underscores.
-        (2) Insert 'bpcal' tags for bandpass calibrators found in the 'caldata' catalogue
-            and remove 'bpcal' tags for calibrators that are not.
+        (2) Rename bandpass calibrators to sanitised name for flux calibration
         (3) Add calibrator model information for bandpass calibrators.
         (4) If there is no bandpass calibrator in the observation- check for targets with a flux
             model that can then be used as a bandpass calibrator.
@@ -425,8 +424,8 @@ def KATh5Condition(katdata, caldata, err):
         # Update the calibrator flux model
         if offset*3600.0 < 200.0:        # 200.0 arcseconds should be close enough...
             targ.flux_model = fluxcal.flux_model
-            if 'bpcal' not in targ.tags: targ.tags.append('bpcal')
-            targ.name = fluxcal.name
+            if 'bpcal' in targ.tags:
+                targ.name = fluxcal.name
         else:                            # Not a bandpass calibrator
             if 'bpcal' in targ.tags: targ.tags.remove('bpcal')
         if 'bpcal' in targ.tags:
