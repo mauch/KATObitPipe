@@ -183,6 +183,7 @@ def GetKATMeta(katdata, err):
     tg = []
     tt = []
     td = {}
+    tn = []
     i = 0
 
     for ti in katdata.target_indices:
@@ -197,9 +198,9 @@ def GetKATMeta(katdata, err):
         deca = UVDesc.PDMS2Dec(str(decs).replace(':',' '))
         raa  = UVDesc.PHMS2RA(str(ras).replace(':',' '))
         #Avoid duplicates
-        for ct in tl:
-            if ct[1] == name:
-                continue
+        if name in tn:
+            continue
+        tn.append(name)
         i += 1
         tl.append((i, name, ra, dec, raa, deca))
         if 'bpcal' in t.tags:

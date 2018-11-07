@@ -664,6 +664,9 @@ def KATInitTargParms(katdata,parms,err):
     else:
         for cal in katdata.target_indices: parms["targets"].append(katdata.catalogue.targets[cal].name[0:12])   #All Sources
     parms["targets"] = list(set(parms["targets"])) # Remove duplicates
+    parms["BPCal"] = list(set(parms["BPCal"]))
+    parms["ACal"] = list(set(parms["ACal"]))
+    parms["PCal"] = list(set(parms["PCal"]))
     # Do this here to catch user input targets with spaces in the name.
     parms["targets"] = [targ.replace(' ','_') for targ in parms["targets"]]
 
@@ -671,13 +674,13 @@ def KATInitTargParms(katdata,parms,err):
     # Bandpass calibrators
     parms["BPCals"]=parms.get("BPCals",[])
     if not parms["BPCals"]:
-        for cal in bpcal:
+        for cal in parms["BPCal"]:
             #Try and find a bpcal model in disk 1
-            modelfile = '%sLModel.fits'%(cal.name[0:12])
+            modelfile = '%sLModel.fits'%(cal[0:12])
             if os.path.isfile(FITSDir.FITSdisks[0] + modelfile):
-                model=EVLACalModel(cal.name[0:12],CalDisk=1,CalDataType='FITS',CalFile=modelfile,CalCCVer=1,CalCmode='COMP',CalNfield=1)
+                model=EVLACalModel(cal[0:12],CalDisk=1,CalDataType='FITS',CalFile=modelfile,CalCCVer=1,CalCmode='COMP',CalNfield=1)
             else:
-                model=EVLACalModel(cal.name[0:12])
+                model=EVLACalModel(cal[0:12])
             parms["BPCals"].append(model)
 
     # Check the best bandpass calibrator to plot
@@ -696,13 +699,13 @@ def KATInitTargParms(katdata,parms,err):
     # Amplitude Calibrators
     parms["ACals"]= parms.get("ACals",[])
     if not parms["ACals"]:
-        for cal in ampcal:
+        for cal in parms["ACal"]:
             #Try and find a model in disk 1
-            modelfile = '%sLModel.fits'%(cal.name[0:12])
+            modelfile = '%sLModel.fits'%(cal[0:12])
             if os.path.isfile(FITSDir.FITSdisks[0] + modelfile):
-                model=EVLACalModel(cal.name[0:12],CalDisk=1,CalDataType='FITS',CalFile=modelfile,CalCCVer=1,CalCmode='COMP',CalNfield=1)
+                model=EVLACalModel(cal[0:12],CalDisk=1,CalDataType='FITS',CalFile=modelfile,CalCCVer=1,CalCmode='COMP',CalNfield=1)
             else:
-                model=EVLACalModel(cal.name[0:12])
+                model=EVLACalModel(cal[0:12])
             parms["ACals"].append(model)
 
     # Gain Calibrators
@@ -711,10 +714,9 @@ def KATInitTargParms(katdata,parms,err):
     if not parms["PCals"]:
         PCals = []
         tcals = []
-        for cal in gaincal:
-            if not cal in parms["PCal"]:
-                PCals.append(EVLACalModel(cal.name[0:12]))
-                tcals.append(cal)
+        for cal in parms["PCal"]:
+            PCals.append(EVLACalModel(cal[0:12]))
+            tcals.append(cal)
         # Check for standard model
         EVLAStdModel(PCals, parms["KAT7Freq"])
         parms["PCals"]          = PCals   # Phase calibrator(s)
