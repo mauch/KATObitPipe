@@ -606,8 +606,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
     scan_fg = numpy.empty((max_scan, nchan, nprod), dtype=katdata.flags.dtype)
     scan_wt = numpy.empty((max_scan, nchan, nprod), dtype=numpy.float32)
     for scan, state, target in katdata.scans():
-        if target.name!='1934-638':
-            continue
         # Don't read at all if all will be "Quacked"
         if katdata.shape[0] < ((QUACK + 1) * timeav):
             continue
