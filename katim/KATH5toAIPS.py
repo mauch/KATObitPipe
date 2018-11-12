@@ -123,7 +123,7 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     OErr.PLog(err, OErr.Info, "Create Initial CL table")
     OErr.printErr(err)
     print "Create Initial CL table\n"
-    UV.PTableCLfromNX(outUV, meta["nants"], err, calInt=calInt)
+    UV.PTableCLfromNX(outUV, meta["maxant"], err, calInt=calInt)
     outUV.Open(UV.READONLY,err)
     outUV.Close(err)
     if err.isErr:
@@ -222,23 +222,26 @@ def GetKATMeta(katdata, err):
     katdata.ants.sort()
     out["newants"] = katdata.ants
     out["nants"]   = len(katdata.ants)
+    antnums = []
     for a in out["newants"]:
         name  = a.name
         x,y,z = a.position_ecef
         diam  = a.diameter
-        i += 1
+        i = int(name[1:]) + 1
+        antnums.append(i)
         al.append((i, name, x, y, z, diam))
         alook[name] = i
     out["ants"] = al
     out["antLookup"] = alook
+    out["maxant"] = max([alook[i] for i in alook])
     # Data products
     nstokes = 4
     #Set up array linking corr products to indices
     dl = numpy.empty((out["nants"], out["nants"], nstokes), dtype=numpy.int)
     bl = []
     for idx, d in enumerate(katdata.corr_products):
-        a1 = out["antLookup"][d[0][:4]] - 1
-        a2 = out["antLookup"][d[1][:4]] - 1
+        a1 = antnums.index(alook[d[0][:4]])
+        a2 = antnums.index(alook[d[1][:4]])
         if d[0][4:]=='h' and d[1][4:]=='h':
             dp = 0
         elif d[0][4:]=='v' and d[1][4:]=='v':
@@ -250,7 +253,8 @@ def GetKATMeta(katdata, err):
         dl[a1, a2, dp] = idx
         #Fill the matrix with the inverse baselines
         dl[a2, a1, dp] = idx
-    out["baselines"] = numpy.array([(b[0],b[1]) for b in itertools.combinations_with_replacement(range(out["nants"]),2)])
+    out["baselines"] = numpy.array([(b[0],b[1]) for b in itertools.combinations_with_replacement(antnums,2)])
+    out["blineind"] = numpy.array([(b[0],b[1]) for b in itertools.combinations_with_replacement(range(out["nants"]),2)])
     out["products"] = dl
     out["nstokes"]  = nstokes
     # integration time
@@ -533,6 +537,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
     newants = meta["newants"]
     p       = meta["products"]      # baseline stokes indices
     b       = meta["baselines"]
+    bi      = meta["blineind"]
     nbase   = b.shape[0]                # number of correlations/baselines
     nprod   = nbase * nstok
     antslookup = meta["antLookup"]
@@ -601,6 +606,8 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
     scan_fg = numpy.empty((max_scan, nchan, nprod), dtype=katdata.flags.dtype)
     scan_wt = numpy.empty((max_scan, nchan, nprod), dtype=numpy.float32)
     for scan, state, target in katdata.scans():
+        if target.name!='1934-638':
+            continue
         # Don't read at all if all will be "Quacked"
         if katdata.shape[0] < ((QUACK + 1) * timeav):
             continue
@@ -641,7 +648,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             numvis += fg.size
 
             # uvw calculation
-            uvw_coordinates = get_uvw_coordinates(array_centre, baseline_vectors, tm, target, b)
+            uvw_coordinates = get_uvw_coordinates(array_centre, baseline_vectors, tm, target, bi)
 
             # Convert to aipsish
             uvw_coordinates /= lamb
@@ -660,7 +667,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             # Loop over integrations
             for iint in range(0, nint):
                 # Fill the buffer for this integration
-                buff = fill_buffer(vs[iint], fg[iint], wt[iint], rp[iint], p, b, buff)
+                buff = fill_buffer(vs[iint], fg[iint], wt[iint], rp[iint], p, bi, buff)
                 # Write to disk
                 outUV.Write(err, firstVis=visno)
                 visno += nbase
@@ -729,7 +736,7 @@ def get_random_parameters(dbiloc, bl, uvws, tm, suid):
     rp = numpy.empty((len(tm), len(bl), dbiloc['nrparm'],), dtype=numpy.float32)
 
     # Get baselines in aips format
-    aips_bl = 256.0*(bl[:, 0] + 1) + (bl[:, 1] + 1)
+    aips_bl = 256.0*(bl[:, 0]) + (bl[:, 1])
     # uvw
     rp[..., dbiloc['ilocu']] = uvws[..., 0]
     rp[..., dbiloc['ilocv']] = uvws[..., 1]

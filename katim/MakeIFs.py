@@ -114,13 +114,13 @@ def UVMakeIF (outUV, nIF, err, solInt=10.):
     # Convert FQ Table
     UpdateFQ2 (outUV, nIF, err)
     # Convert AN Table
-    nants = UpdateAN2 (outUV, nIF, err)
+    maxant = UpdateAN2 (outUV, nIF, err)
     # Convert SU Table
     UpdateSU2 (outUV, nIF, err)
     # Regenerate CL table 1 - delete any old
     outUV.ZapTable("AIPS CL",-1,err)
     print '(Re) generate CL table'
-    UV.PTableCLfromNX(outUV, nants, err, calInt=solInt)
+    UV.PTableCLfromNX(outUV, maxant, err, calInt=solInt)
     # dummy FG 1
     print 'Dummy entry in Flag table 1'
     UV.PFlag(outUV, err, timeRange=[-10.,-9.], Ants=[200,200], Stokes='0000',Reason='Dummy')
@@ -522,9 +522,11 @@ def UpdateAN2 (outUV, nIF, err):
         oANTab.keys[k] = iANTab.keys[k]
     
     nrow = iANTab.Desc.Dict['nrow']  # How many rows?
+    maxant = -1
     for irow in range(1,nrow+1):
         row = iANTab.ReadRow(irow,err)  # Read input row
-        
+        if row['NOSTA'][0] > maxant:
+            maxant = row['NOSTA'][0]
         # Update  row
         pca0 = row['POLCALA'][0]
         pca1 = row['POLCALA'][1]
@@ -561,7 +563,7 @@ def UpdateAN2 (outUV, nIF, err):
     # Update
     outUV.UpdateDesc(err)
     OErr.printErrMsg(err,"Error converting AN Table")
-    return nrow
+    return maxant
     # end UpdateAN2
     
 def UpdateSU2 (outUV, nIF, err):
