@@ -168,8 +168,8 @@ def KATInitContParms():
                                         # If BL, then FOV and maxInt are chosen from imaging
                                         # parameters.
     parms["avgClass"] =      "UVAvg"    # AIPS class of calibrated/averaged uv data
-    parms["CalAvgTime"] =    7.5/60.0   # Time for averaging calibrated uv data (min)
-    parms["avgStokes"] =     ' '     # Stokes to extract on average.
+    parms["CalAvgTime"] =    0.         # Time for averaging calibrated uv data (min)
+    parms["avgStokes"] =     ' '        # Stokes to extract on average.
     parms["CABIF"] =         1          # First IF to copy
     parms["CAEIF"] =         0          # Highest IF to copy
     parms["chAvg"]   =       None       # No channel average
