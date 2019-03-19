@@ -33,6 +33,7 @@ try:
     import katdal
     from katdal import averager
     from katdal.lazy_indexer import DaskLazyIndexer
+    from katdal.chunkstore import StoreUnavailable
     import katpoint
 except Exception, exception:
     print exception
@@ -615,10 +616,17 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             scan_slices[-1] = slice(scan_slices[-1].start, katdata.shape[0], 1)
         else:
             scan_slices = [slice(QUACK * timeav, katdata.shape[0])]
+        # Number of integrations
+        nint = katdata.timestamps.shape[0] - QUACK
+        msg = "Scan:%4d Int: %4d %16s Start %s"%(scan, nint, target.name,
+                                                 day2dhms((katdata.timestamps[0] - time0) / 86400.0)[0:12])
+        OErr.PLog(err, OErr.Info, msg);
+        OErr.printErr(err)
+        print msg
         for sl in scan_slices:
             tm = katdata.timestamps[sl]
-            nint = tm.shape[0]
-            load(katdata, numpy.s_[sl.start:sl.stop, :, :], scan_vs[:nint], scan_wt[:nint], scan_fg[:nint])
+            load(katdata, numpy.s_[sl.start:sl.stop, :, :], scan_vs[:nint], scan_wt[:nint], scan_fg[:nint], err)
+
             # Make sure we've reset the weights
             wt = scan_wt[:nint]
             if doweight==False:
@@ -657,11 +665,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             #Get random parameters for this scan
             rp = get_random_parameters(idb, b, uvw_coordinates, tm, suid)
 
-            # Number of integrations
-            msg = "Scan:%4d Int: %4d %16s Start %s"%(scan, nint, target.name, day2dhms(tm[0])[0:12])
-            OErr.PLog(err, OErr.Info, msg);
-            OErr.printErr(err)
-            print msg
             # Loop over integrations
             for iint in range(0, nint):
                 # Fill the buffer for this integration
@@ -748,7 +751,13 @@ def get_random_parameters(dbiloc, bl, uvws, tm, suid):
 
     return rp
 
-def load(dataset, indices, vis, weights, flags):
+
+# Number of times to try reading each chunk before giving up
+NUM_RETRIES = 3
+# Number of dumps to read at at time
+CHUNK_SIZE = 2
+
+def load(dataset, indices, vis, weights, flags, err):
     """Load data from lazy indexers into existing storage.
     This is optimised for the MVF v4 case where we can use dask directly
     to eliminate one copy, and also load vis, flags and weights in parallel.
@@ -758,16 +767,37 @@ def load(dataset, indices, vis, weights, flags):
     dataset : :class:`katdal.DataSet`
         Input dataset, possibly with an existing selection
     indices : tuple
-        Index expression for subsetting the dataset
+        Slice expression for subsetting the dataset
     vis, flags : array-like
         Outputs, which must have the correct shape and type
     """
-    if isinstance(dataset.vis, DaskLazyIndexer):
-        DaskLazyIndexer.get([dataset.vis, dataset.weights, dataset.flags], indices, out=[vis, weights, flags])
-    else:
-        vis[:] = dataset.vis[indices]
-        weights[:] = dataset.weights[indices]
-        flags[:] = dataset.flags[indices]
+    
+    t_min = indices[0].start
+    t_max = indices[0].stop
+    time_slices = [slice(ts, min(ts+CHUNK_SIZE, t_max)) for ts in range(t_min, t_max, CHUNK_SIZE)]
+    for ts in time_slices:
+        ts_start = ts.start - t_min + 1
+        for i in range(NUM_RETRIES):
+            try:
+                if isinstance(dataset.vis, DaskLazyIndexer):
+                    DaskLazyIndexer.get([dataset.vis, dataset.weights, dataset.flags], ts, out=[vis[ts], weights[ts], flags[ts]])
+                else:
+                    vis[ts] = dataset.vis[ts]
+                    weights[ts] = dataset.weights[ts]
+                    flags[ts] = dataset.flags[ts]
+                break
+            except StoreUnavailable:
+                msg = 'Timeout when reading dumps %d to %d. Try %d/%d....' % (ts_start, ts.stop - 1, i + 1, NUM_RETRIES)
+                OErr.PLog(err, OErr.Warn, msg);
+                OErr.printErr(err)
+                print msg
+        # Flag the data and warn if we can't get it
+        if i == NUM_RETRIES - 1:
+            msg = 'Too many timeouts, flagging dumps %d to %d' % (ts_start, ts.stop - 1)
+            OErr.PLog(err, OErr.Warn, msg);
+            OErr.printErr(err)
+            print msg
+            flags[ts] = True
 
 @numba.jit(nopython=True, parallel=True)
 def fill_buffer(in_vis, in_flags, in_weights, in_rparm, cp_index, bls_index, out_buffer, or_flags_pols=True):
