@@ -455,11 +455,10 @@ def MKATh5Select(katdata, parms, err, **kwargs):
         (5) Select frequency range (overrideable via kwargs)
 
     The checks performed on the attenuated view are as follows:
-        (1) Check that the script is one of: image.py, track.py, runobs.py.
-        (2) Check that there are at least 4 antannas.
-        (3) Check that there are scans left after the selections. 
-        (4) Check that there are targets left after the selections.
-        (5) Check that there is at least 1 bandpass calibrator.
+        (1) Check that there are at least 4 antannas.
+        (2) Check that there are scans left after the selections. 
+        (3) Check that there are targets left after the selections.
+        (4) Check that there is at least 1 bandpass calibrator.
 
     Parameters
     ----------
@@ -565,7 +564,6 @@ def MKATh5Select(katdata, parms, err, **kwargs):
 
     parms["BChDrop"]=first_chan
     parms["EChDrop"]=katdata.shape[1]-last_chan
-
 
     if (first_chan < 0) or (last_chan >= katdata.shape[1]):
         raise RuntimeError("Requested channel range outside data set boundaries. Set channels in the range [0,%s]" % (katdata.shape[1]-1,))
