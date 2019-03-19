@@ -574,14 +574,6 @@ def MKATh5Select(katdata, parms, err, **kwargs):
     print "\nChannel range %s through %s." % (first_chan, last_chan)
     katdata.select(channels=chan_range)
 
-    script=katdata.obs_params['script_name']
- 
-    scriptname=os.path.basename(script)
-    if scriptname not in ['image.py','track.py','runobs.py','dyn_image.py','beamform_dualpol.py','kiss_image.py','image_AR1.py','bf_phaseup_AR1.py','image_pointing.py']:
-         OErr.PLog(err, OErr.Fatal, "Imaging run with script: \'%s\' not imagable."%(scriptname))
-         OErr.printErr(err)
-         raise KATUnimageableError("Imaging run with script: \'%s\' not imagable."%(scriptname))
-
     # More than 4 antennas
     if len(katdata.ants) < 4:
         OErr.PLog(err, OErr.Fatal, "Too few antennas to process image")
