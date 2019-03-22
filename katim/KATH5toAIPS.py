@@ -755,7 +755,7 @@ def get_random_parameters(dbiloc, bl, uvws, tm, suid):
 # Number of times to try reading each chunk before giving up
 NUM_RETRIES = 3
 # Number of dumps to read at at time
-CHUNK_SIZE = 2
+CHUNK_SIZE = 1
 
 def load(dataset, indices, vis, weights, flags, err):
     """Load data from lazy indexers into existing storage.
