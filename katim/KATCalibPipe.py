@@ -146,6 +146,8 @@ def MKContPipeline(files, outputdir, **kwargs):
     else:
         # Pick up static flags
         sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle')
+        if katdata.spectral_windows[katdata.spw] == 'UHF':
+            sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle')
         sflags = sflags[katdata.channels]
         # Number of baselines gives batch size
         nbl = len(np.unique([(cp[0][:-1] + cp[1][:-1]).upper() for cp in katdata.corr_products]))
