@@ -617,14 +617,15 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
         else:
             scan_slices = [slice(QUACK * timeav, katdata.shape[0])]
         # Number of integrations
-        nint = katdata.timestamps.shape[0] - QUACK
-        msg = "Scan:%4d Int: %4d %16s Start %s"%(scan, nint, target.name,
+        num_ints = katdata.timestamps.shape[0] - QUACK * timeav
+        msg = "Scan:%4d Int: %4d %16s Start %s"%(scan, num_ints, target.name,
                                                  day2dhms((katdata.timestamps[0] - time0) / 86400.0)[0:12])
         OErr.PLog(err, OErr.Info, msg);
         OErr.printErr(err)
         print msg
         for sl in scan_slices:
             tm = katdata.timestamps[sl]
+            nint = tm.shape[0]
             load(katdata, numpy.s_[sl.start:sl.stop, :, :], scan_vs[:nint], scan_wt[:nint], scan_fg[:nint], err)
 
             # Make sure we've reset the weights
@@ -755,7 +756,7 @@ def get_random_parameters(dbiloc, bl, uvws, tm, suid):
 # Number of times to try reading each chunk before giving up
 NUM_RETRIES = 3
 # Number of dumps to read at at time
-CHUNK_SIZE = 1
+CHUNK_SIZE = 2
 
 def load(dataset, indices, vis, weights, flags, err):
     """Load data from lazy indexers into existing storage.
@@ -774,17 +775,20 @@ def load(dataset, indices, vis, weights, flags, err):
     
     t_min = indices[0].start
     t_max = indices[0].stop
-    time_slices = [slice(ts, min(ts+CHUNK_SIZE, t_max)) for ts in range(t_min, t_max, CHUNK_SIZE)]
-    for ts in time_slices:
-        ts_start = ts.start - t_min + 1
+    in_time_slices = [slice(ts, min(ts+CHUNK_SIZE, t_max)) for ts in range(t_min, t_max, CHUNK_SIZE)]
+    for in_ts in in_time_slices:
+        out_ts = slice(in_ts.start - t_min, in_ts.stop - t_min)
+        out_vis = vis[out_ts]
+        out_weights = weights[out_ts]
+        out_flags = flags[out_ts]
         for i in range(NUM_RETRIES):
             try:
                 if isinstance(dataset.vis, DaskLazyIndexer):
-                    DaskLazyIndexer.get([dataset.vis, dataset.weights, dataset.flags], ts, out=[vis[ts], weights[ts], flags[ts]])
+                    DaskLazyIndexer.get([dataset.vis, dataset.weights, dataset.flags], in_ts, out=[out_vis, out_weights, out_flags])
                 else:
-                    vis[ts] = dataset.vis[ts]
-                    weights[ts] = dataset.weights[ts]
-                    flags[ts] = dataset.flags[ts]
+                    out_vis = dataset.vis[in_ts]
+                    out_weights = dataset.weights[in_ts]
+                    out_flags = dataset.flags[in_ts]
                 break
             except StoreUnavailable:
                 msg = 'Timeout when reading dumps %d to %d. Try %d/%d....' % (ts_start, ts.stop - 1, i + 1, NUM_RETRIES)
@@ -793,11 +797,11 @@ def load(dataset, indices, vis, weights, flags, err):
                 print msg
         # Flag the data and warn if we can't get it
         if i == NUM_RETRIES - 1:
-            msg = 'Too many timeouts, flagging dumps %d to %d' % (ts_start, ts.stop - 1)
+            msg = 'Too many timeouts, flagging dumps %d to %d' % (out_ts.start + 1, out_ts.stop)
             OErr.PLog(err, OErr.Warn, msg);
             OErr.printErr(err)
             print msg
-            flags[ts] = True
+            flags[out_ts] = True
 
 @numba.jit(nopython=True, parallel=True)
 def fill_buffer(in_vis, in_flags, in_weights, in_rparm, cp_index, bls_index, out_buffer, or_flags_pols=True):
