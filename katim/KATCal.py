@@ -5656,7 +5656,7 @@ def KATImageTargets(uv, err, Sources=None,  FreqID=1, seq=1, sclass="IClean", ba
         #if doOutlier or ((doOutlier==None) and refFreq<6.0e9):
             # Use NVSS north of dec 30 S and SUMMS southward
         #    if suinfo["Dec"]<-30.0:
-        imager.Catalog = 'NVSS_SUMMS_VZ.FIT.gz'
+        imager.Catalog = 'AllSkyVZ.FIT.gz'
         # Get the source parameters for this source
         #iflux=suinfo["IFlux"][0]
         iflux=0.0
