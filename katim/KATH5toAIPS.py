@@ -274,6 +274,7 @@ def GetKATMeta(katdata, err):
     out["centerfreq"] = katdata.channel_freqs[numchan //2]
     # Expose all KAT-METADATA to calling script
     out["katdata"] = katdata
+    out["RX"] = katdata.spectral_windows[katdata.spw].band
     return out
     # end GetKATMeta
 
@@ -391,7 +392,7 @@ def WriteFQTable(outUV, meta, err):
         row['IF FREQ']   = [sw[1] - reffreq]
         row['CH WIDTH']  = [sw[2]]
         row['TOTAL BANDWIDTH']  = [abs(sw[2])*sw[0]]
-        row['RXCODE']  = ['L']
+        row['RXCODE']  = [meta['RX']]
         if sw[2]>0.0:
             row['SIDEBAND']  = [1]
         else:
