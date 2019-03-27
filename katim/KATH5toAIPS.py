@@ -792,7 +792,7 @@ def load(dataset, indices, vis, weights, flags, err):
                     out_flags = dataset.flags[in_ts]
                 break
             except StoreUnavailable:
-                msg = 'Timeout when reading dumps %d to %d. Try %d/%d....' % (ts_start, ts.stop - 1, i + 1, NUM_RETRIES)
+                msg = 'Timeout when reading dumps %d to %d. Try %d/%d....' % (out_ts.start + 1, out_ts.stop, i + 1, NUM_RETRIES)
                 OErr.PLog(err, OErr.Warn, msg);
                 OErr.printErr(err)
                 print msg
