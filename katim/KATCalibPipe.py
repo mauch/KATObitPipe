@@ -144,10 +144,20 @@ def MKContPipeline(files, outputdir, **kwargs):
         # TODO: Check if the input data has been Hanned.
         doneHann = True
     else:
+        sw = katdata.spectral_windows[katdata.spw]
         # Pick up static flags
-        sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle')
-        if katdata.spectral_windows[katdata.spw] == 'UHF':
+        if sw.band == 'L':
+            sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle')
+            if kwargs.get('flag', None):
+                mess = 'Using static RFI mask in file %s for L-band'
+                printMess(mess, logFile)
+        elif sw.band == 'UHF':
             sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle')
+            if kwargs.get('flag', None):
+                mess = 'Using static RFI mask in file %s for UHF-band'
+                printMess(mess, logFile)
+        else:
+            sflags = np.zeros(sw.num_chans, dtype=np.bool)
         sflags = sflags[katdata.channels]
         # Number of baselines gives batch size
         nbl = len(np.unique([(cp[0][:-1] + cp[1][:-1]).upper() for cp in katdata.corr_products]))
