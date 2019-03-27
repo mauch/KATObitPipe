@@ -149,12 +149,12 @@ def MKContPipeline(files, outputdir, **kwargs):
         if sw.band == 'L':
             sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle')
             if kwargs.get('flag', None):
-                mess = 'Using static RFI mask in file %s for L-band'
+                mess = 'Using static RFI mask in file %s for L-band' % (ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle',)
                 printMess(mess, logFile)
         elif sw.band == 'UHF':
             sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle')
             if kwargs.get('flag', None):
-                mess = 'Using static RFI mask in file %s for UHF-band'
+                mess = 'Using static RFI mask in file %s for UHF-band' % (ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle',)
                 printMess(mess, logFile)
         else:
             sflags = np.zeros(sw.num_chans, dtype=np.bool)
