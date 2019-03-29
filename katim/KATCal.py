@@ -71,7 +71,8 @@ def KATInitContParms():
 
     # Special editing list
     parms["doEditList"] =  True         # Edit using editList?
-    parms["editFG"] =      1            # Table to apply edit list to
+    parms["editFG"]       = 1            # Table to apply edit list to
+    parms["doCopyFG"]     = True
 
     # Editing
     parms["doClearTab"]   = True        # Clear cal/edit tables

@@ -239,7 +239,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     if not kwargs.get('reuse'):
         if parms["doHann"]:
             uv = KATHann(uv, EVLAAIPSName(project), dataClass, disk, seq, err, \
-                      doDescm=parms["doDescm"], flagVer=0, logfile=logFile, zapin=True, check=check, debug=debug)
+                      doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
             doneHann = True
     
     if doneHann:
@@ -249,7 +249,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         parms["EChDrop"]=int(parms["EChDrop"]/2)
         if uv==None and not check:
             raise RuntimeError,"Cannot Hann data "
- 
+
     # Clear any old calibration/editing 
     if parms["doClearTab"] or kwargs.get('reuse'):
         mess =  "Clear previous calibration"
@@ -257,15 +257,14 @@ def MKContPipeline(files, outputdir, **kwargs):
         EVLAClearCal(uv, err, doGain=parms["doClearGain"], doFlag=parms["doClearFlag"], doBP=parms["doClearBP"], check=check)
         OErr.printErrMsg(err, "Error resetting calibration")
 
-        # Quack to remove data from start and end of each scan
-    # Quack now done automatically by KATH5toAIPS
-    #if parms["doQuack"]:
-    #    retCode = EVLAQuack (uv, err, begDrop=parms["quackBegDrop"], endDrop=parms["quackEndDrop"], \
-    #                         Reason=parms["quackReason"], \
-    #                         logfile=logFile, check=check, debug=debug)
-    #    if retCode!=0:
-    #        raise RuntimeError,"Error Quacking data"
-    
+    # Copy FG 1 to FG 2
+    if parms["doCopyFG"]:
+        mess =  "Copy FG 1 to FG 2"
+        printMess(mess, logFile)
+        retCode = KATCopyFG(uv, err, logfile=logFile, check=check, debug=debug)
+        if retCode!=0:
+            raise RuntimeError,"Error Copying FG table"
+  
     # Flag antennas shadowed by others?
     if parms["doShad"]:
         retCode = EVLAShadow (uv, err, shadBl=parms["shadBl"], \
@@ -273,7 +272,6 @@ def MKContPipeline(files, outputdir, **kwargs):
         if retCode!=0:
             raise RuntimeError,"Error Shadow flagging data"
     
-
     # Median window time editing, for RFI impulsive in time
     if parms["doMednTD1"]:
         mess =  "Median window time editing, for RFI impulsive in time:"
