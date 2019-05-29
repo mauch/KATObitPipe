@@ -787,9 +787,9 @@ def load(dataset, indices, vis, weights, flags, err):
                 if isinstance(dataset.vis, DaskLazyIndexer):
                     DaskLazyIndexer.get([dataset.vis, dataset.weights, dataset.flags], in_ts, out=[out_vis, out_weights, out_flags])
                 else:
-                    out_vis = dataset.vis[in_ts]
-                    out_weights = dataset.weights[in_ts]
-                    out_flags = dataset.flags[in_ts]
+                    out_vis[:] = dataset.vis[in_ts]
+                    out_weights[:] = dataset.weights[in_ts]
+                    out_flags[:] = dataset.flags[in_ts]
                 break
             except StoreUnavailable:
                 msg = 'Timeout when reading dumps %d to %d. Try %d/%d....' % (out_ts.start + 1, out_ts.stop, i + 1, NUM_RETRIES)
