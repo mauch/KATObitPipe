@@ -328,7 +328,7 @@ def WriteANTable(outUV, meta, err):
     antab.keys['RefDate'] = meta["obsdate"]
     antab.keys['Freq']    = meta["spw"][0][1]
     JD                    = UVDesc.PDate2JD(meta["obsdate"])
-    antab.keys['GSTIA0']  = UVDesc.GST0(JD)*15.0
+    antab.keys['GSTiat0'] = UVDesc.GST0(JD)*15.0
     antab.keys['DEGPDY']  = UVDesc.ERate(JD)*360.0
     Table.PDirty(antab),
     # Force update
