@@ -330,7 +330,7 @@ def WriteANTable(outUV, meta, err):
     JD                    = UVDesc.PDate2JD(meta["obsdate"])
     antab.keys['GSTiat0'] = UVDesc.GST0(JD)*15.0
     antab.keys['DEGPDY']  = UVDesc.ERate(JD)*360.0
-    Table.PDirty(antab),
+    Table.PDirty(antab)
     # Force update
     row = antab.ReadRow(1,err)
     if err.isErr:
