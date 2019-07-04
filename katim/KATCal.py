@@ -439,6 +439,181 @@ def KATh5Condition(katdata, caldata, err):
         OErr.printErr(err)
 
 
+def KATh5Select(katdata, parms, err, **kwargs):
+    """This function will modify the katdata object.
+    This function is used to select a subset of targets and scans on the katdata object. 
+    These selections attenuate the 'view' of the katdata object to only show data that 
+    meets the criteria for running the imaging task. Once the selection has been completed, 
+    checks are performed and exceptions are raised if the check fails. The operations are 
+    performed directly on the katdata object passed in.
+
+    The katdata selections are as follows: 
+        (1) Select user requested targets via kwargs. 
+        (2) Select targets that have elevation > 20deg.
+        (3) Select < 30 calibrators (a limit on obit imager).
+        (4) Select the first spectral window (a limit on obit imager)
+        (5) Select frequency range (overrideable via kwargs)
+
+    The checks performed on the attenuated view are as follows:
+        (1) Check that there are at least 4 antannas.
+        (2) Check that there are scans left after the selections. 
+        (3) Check that there are targets left after the selections.
+        (4) Check that there is at least 1 bandpass calibrator.
+
+    Parameters
+    ----------
+        katdata: class `katfile.ConcatenatedDataSet` object or class `katfile.H5DataV2` object
+            The katfile object on which the selections and checks will be performed.
+        err: OErr.OErr()
+            Obit error message stack object
+        **kwargs:
+            Currently can only pass in targets as a kwarg 
+
+    Raises
+    ------
+    KATUnimageableError
+    """
+    #User defined targets
+    if kwargs.get('targets'):
+        katdata.select(targets=kwargs.get('targets').split(','))
+
+    if kwargs.get('dropants'):
+        ants_to_remove = kwargs.get('dropants').split(',')
+        file_ants = [ant.name for ant in katdata.ants]
+        for ant in ants_to_remove:
+            try:
+                file_ants.remove(ant)
+            except ValueError:
+                print "Antenna:", ant, "not in observation. Skipping ..."
+                pass
+        katdata.select(ants=file_ants, reset='')
+
+    #reducing data selections
+    # Tracks only
+    katdata.select(scans='track', reset='')
+
+    # Elevation > 20deg.
+    good_elevations = []
+    for scan, state, target in katdata.scans():
+        # Fetch data
+        tm = katdata.timestamps[:]
+        nint = len(tm)
+        el=target.azel(tm[int(nint/2)])[1]*180./math.pi
+        if el >= 20.0:
+            good_elevations.append(scan)
+        else:   # Throw away scans at low elevation
+            msg = "Rejecting Scan:%s, Target:%s Elevation %4.1f deg."%(scan,target.name,el)
+            OErr.PLog(err, OErr.Info, msg)
+            OErr.printErr(err)
+    katdata.select(scans=good_elevations, reset='')
+
+    # If we are going to do flagging on import- then don't select cal_rfi
+    if kwargs.get('flag'):
+        katdata.select(flags='static,cam,data_lost,ingest_rfi,predicted_rfi', reset='')
+
+    included_targets = []
+    included_bpcals = []
+    included_gaincals = []
+    included_allcals = []
+    for target_index in katdata.target_indices:
+        target=katdata.catalogue.targets[target_index]
+        if 'bpcal' in target.tags:
+            included_bpcals.append(target_index)
+        elif 'gaincal' in target.tags:
+            included_gaincals.append(target_index)
+        else:
+            included_targets.append(target_index)
+    #make list starting with BPcals and then truncate to 30 elements if necessary
+    included_allcals = included_bpcals + included_gaincals
+    if len(included_allcals) > 30:
+        OErr.PLog(err, OErr.Info, "Too many calibrators in file. Truncating to 30.")
+        OErr.printErr(err)
+        included_allcals = included_allcals[0:30]
+    katdata.select(targets=included_allcals+included_targets, reset='')
+
+    # Only select 1 spectral window
+    if len(katdata.spectral_windows) > 1:
+        OErr.PLog(err, OErr.Info, "The file contains more than one spectral window.\n Will only image the first.")
+        OErr.printErr(err)
+        #First spectral window is selected by default.
+
+    channel_range=kwargs.get('channel_range')
+    nchan=katdata.shape[1]
+    if channel_range:
+        channel_range = [int(chan_str) for chan_str in channel_range.split(',')]
+        first_chan, last_chan = channel_range[0], channel_range[1]
+        parms["BChDrop"]=first_chan
+        parms["EChDrop"]=katdata.shape[1]-last_chan
+    else:
+        # Select Channel Range
+        BChanFracDrop = int(nchan*parms['begChanFrac'])
+        EChanFracDrop = int(nchan*parms['endChanFrac'])
+
+        if parms["BChDrop"]== None:
+            parms["BChDrop"]=BChanFracDrop
+        if parms["EChDrop"]== None:
+            parms["EChDrop"]=EChanFracDrop
+        first_chan=parms["BChDrop"]
+        last_chan=katdata.shape[1]-parms["EChDrop"]
+    chan_after_ifs=(last_chan-first_chan +1)%8
+    if chan_after_ifs!=0:
+        #Ensure number of channels divides into number of IFs
+        first_chan=first_chan+(chan_after_ifs//2)
+        last_chan=last_chan-(chan_after_ifs-(chan_after_ifs//2))
+        print "Trimming %s channnels to divide band into 8 even sized IFs"% (chan_after_ifs,)
+
+    parms["BChDrop"]=first_chan
+    parms["EChDrop"]=katdata.shape[1]-last_chan
+
+    if (first_chan < 0) or (last_chan >= katdata.shape[1]):
+        raise RuntimeError("Requested channel range outside data set boundaries. Set channels in the range [0,%s]" % (katdata.shape[1]-1,))
+    chan_range = slice(first_chan, last_chan + 1)
+
+    print "\nChannel range %s through %s." % (first_chan, last_chan)
+    katdata.select(channels=chan_range)
+
+    # More than 4 antennas
+    if len(katdata.ants) < 4:
+        OErr.PLog(err, OErr.Fatal, "Too few antennas to process image")
+        OErr.printErr(err)
+        raise KATUnimageableError("Too few antennas to process image")
+
+    # Must have some scans
+    if len(katdata.scan_indices) == 0:
+        OErr.PLog(err, OErr.Fatal, "No scan of type:track in file to image.")
+        OErr.printErr(err)
+        raise KATUnimageableError("No scan of type:track in file to image.")
+
+    # Must have some targets (not sure this is needed??)
+    if len(katdata.target_indices) == 0:
+        OErr.PLog(err, OErr.Fatal, "No targets in file to image.")
+        OErr.printErr(err)
+        raise KATUnimageableError("No targets in file to image.")
+
+    # Must have a bandpass calibrator
+    BPOK=False
+    for targ in katdata.target_indices:
+        cal=katdata.catalogue.targets[targ]
+        #Correct target name for PKS-1934
+        if 'bpcal' in cal.tags: BPOK=True
+    BPOK = True
+    # Check if BPCal exists - exit if not.
+    if not BPOK:
+        OErr.PLog(err, OErr.Fatal, "No Bandpass calibrator. Can't image this observation.")
+        OErr.printErr(err)
+        raise KATUnimageableError("No Bandpass calibrator. Can't image this observation.")
+
+    # Only image things with sensible dump rates
+    if katdata.dump_period < 0.4:
+        OErr.PLog(err, OErr.Fatal, "Dump rate too small for imaging.")
+        OErr.printErr(err)
+        raise KATUnimageableError("Dump rate too small for imaging.")
+
+    #Other errors
+    if err.isErr:
+        OErr.printErrMsg(err, "Error with h5 file")
+
+
 def KATInitTargParms(katdata,parms,err):
     """
     Update the target paramaters for the pipeline using the metadata
