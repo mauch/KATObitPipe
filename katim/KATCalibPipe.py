@@ -83,7 +83,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     ############################# Initialise Parameters ##########################################
     ####### Initialize parameters dictionary ##### 
     parms = KATInitContParms()
-    parms['XYfix'] = kwargs.get('XYfix')
+    parms['PolCal'] = kwargs.get('polcal')
     parms['XYtarg'] = kwargs.get('XYtarg')
     ####### User defined parameters ######
     if kwargs.get('parmFile'):
@@ -106,20 +106,14 @@ def MKContPipeline(files, outputdir, **kwargs):
         OErr.PLog(err, OErr.Fatal, "Unable to read KAT HDF5 data in " + str(h5file))
         raise KATUnimageableError("Unable to read KAT HDF5 data in " + str(h5file))
 
-    #Are we MeerKAT or KAT-7
-    telescope = katdata.ants[0].name[0]
-    if telescope=='m':
-        sefd=500.
-    else:
-        sefd=1200.
     #Get calibrator models
     fluxcals = katpoint.Catalogue(file(FITSDir.FITSdisks[0]+"/"+parms["fluxModel"]))
     #Condition data (get bpcals, update names for aips conventions etc)
-    KATh5Condition(katdata,fluxcals,err)
+    KATh5Condition(katdata, fluxcals, err)
 
     ###################### Data selection and static edits ############################################
     # Select data based on static imageable parameters
-    MKATh5Select(katdata, parms, err, **kwargs)
+    KATh5Select(katdata, parms, err, **kwargs)
 
     # General AIPS data parameters at script level
     dataClass = ("UVDa")[0:6]      # AIPS class of raw uv data
@@ -169,11 +163,12 @@ def MKContPipeline(files, outputdir, **kwargs):
         obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
         MakeIFs.UVMakeIF(uv,8,err,solInt=katdata.dump_period)
         os.remove(outtemplate)
+
     # Print the uv data header to screen.
     uv.Header(err)
     ############################# Set Project Processing parameters ###################################
     # Parameters derived from obsdata and katdata
-    MKATGetObsParms(obsdata, katdata, parms, logFile)
+    KATGetObsParms(obsdata, katdata, parms, logFile)
 
     ###### Initialise target parameters #####
     KATInitTargParms(katdata,parms,err)
