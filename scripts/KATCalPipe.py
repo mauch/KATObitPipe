@@ -59,7 +59,7 @@ if len(katfilenames) == 0:
 katfilenames = get_archive(katfilenames)
 
 kwargs = {}
-for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'XYfix', 'XYtarg']:
+for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'polcal', 'XYtarg']:
 	if getattr(options,k) != None:
 		kwargs[k] =  getattr(options,k)
 try:
