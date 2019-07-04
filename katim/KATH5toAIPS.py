@@ -47,7 +47,7 @@ import UV, UVVis, OErr, UVDesc, Table, History
 from OTObit import day2dhms
 import numpy
 import itertools
-import pyfits
+from astropy.io import fits as pyfits
 import multiprocessing
 import concurrent.futures
 import dask
@@ -689,11 +689,12 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
     # end ConvertKATData
 
 
-def MakeTemplate(inuv,outuv,numchans,nvispio=1024):
+def MakeTemplate(inuv, outuv, katdata):
     """
     Construct a template file with the correct channel range and write it to outuv.
     """
-    #numchans=len(katdata.channel_freqs)
+    numchans = len(katdata.channel_freqs)
+    nvispio = len(numpy.unique([(cp[0][:-1] + cp[1][:-1]).upper() for cp in katdata.corr_products]))
     uvfits = pyfits.open(inuv)
     #Resize the visibility table
     vistable = uvfits[1].columns
@@ -707,8 +708,7 @@ def MakeTemplate(inuv,outuv,numchans,nvispio=1024):
 
     newuvfits = pyfits.HDUList([uvfits[0],vishdu,uvfits[2],uvfits[3],uvfits[4],uvfits[5],uvfits[6]])
     #Add nvispio rows
-
-    newuvfits.writeto(outuv,clobber=True)
+    newuvfits.writeto(outuv, overwrite=True)
 
 def flag_data(vs,fg,flagger):
     """

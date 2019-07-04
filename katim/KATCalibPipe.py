@@ -77,7 +77,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     disk = 1
     fitsdisk = 0
     nam = os.path.basename(os.path.splitext(files[0])[0])[0:10]
-    cls = "Raw"
+    clss = "Raw"
     seq = 1
 
     ############################# Initialise Parameters ##########################################
@@ -106,6 +106,11 @@ def MKContPipeline(files, outputdir, **kwargs):
         OErr.PLog(err, OErr.Fatal, "Unable to read KAT HDF5 data in " + str(h5file))
         raise KATUnimageableError("Unable to read KAT HDF5 data in " + str(h5file))
 
+    # If we are doing polcal- search for the most recent delaycal observation
+    if parms['PolCal']:
+        delay_katdata = KATGetDelayCal(katdata, h5file)
+        kwargs["delay_katdata"] = delay_katdata
+
     #Get calibrator models
     fluxcals = katpoint.Catalogue(file(FITSDir.FITSdisks[0]+"/"+parms["fluxModel"]))
     #Condition data (get bpcals, update names for aips conventions etc)
@@ -117,6 +122,7 @@ def MKContPipeline(files, outputdir, **kwargs):
 
     # General AIPS data parameters at script level
     dataClass = ("UVDa")[0:6]      # AIPS class of raw uv data
+    delayClass = "DELA"
     band      = katdata.spectral_windows[0].product #Correlator product
     project   = os.path.basename(os.path.splitext(files[0])[0])[0:10]  # Project name (12 char or less, used as AIPS Name)
     outIClass = parms["outIClass"] # image AIPS class
@@ -153,16 +159,21 @@ def MKContPipeline(files, outputdir, **kwargs):
         else:
             sflags = np.zeros(sw.num_chans, dtype=np.bool)
         sflags = sflags[katdata.channels]
-        # Number of baselines gives batch size
-        nbl = len(np.unique([(cp[0][:-1] + cp[1][:-1]).upper() for cp in katdata.corr_products]))
         # Construct a template uvfits file from master template
         mastertemplate = ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'MKATTemplate.uvtab.gz'
         outtemplate = nam + '.uvtemp'
-        KATH5toAIPS.MakeTemplate(mastertemplate,outtemplate,len(katdata.channel_freqs),nvispio=nbl)
-        uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), cls, disk, seq, err)
+        if parms["PolCal"]:
+            mess = 'Loading auto correlations from delay calibration with CBID: %s' % (delay_katdata.obs_params['capture_block_id'],)
+            printMess(mess, logFile)
+            # Load the delay cal observation
+            KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
+            delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delayClass, disk, seq, err)
+            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
+        KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
+        uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), clss, disk, seq, err)
+        os.remove(outtemplate)
         obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
         MakeIFs.UVMakeIF(uv,8,err,solInt=katdata.dump_period)
-        os.remove(outtemplate)
 
     # Print the uv data header to screen.
     uv.Header(err)

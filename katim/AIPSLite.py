@@ -97,7 +97,6 @@ def make_da00(da00_path=None, force=False):
     if not os.path.exists(da00_path) or force:
         template_path = os.environ['AIPS_VERSION'] + '/' + os.environ['ARCH'] + '/TEMPLATE'
         shutil.copytree(template_path, da00_path)
-    print template_path
     os.environ['DA00'] = da00_path
     os.environ['NET0'] = da00_path
     # Added by TM 25/3/2012 Set up NETSP file in $NET0 to remove error messages.

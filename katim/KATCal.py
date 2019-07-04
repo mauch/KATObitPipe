@@ -23,7 +23,7 @@ import itertools
 import datetime
 import xml.dom.minidom
 import katpoint
-import katdal as katfile
+import katdal
 from ObitTalkUtil import FITSDir
 from KATImExceptions import KATUnimageableError
 
@@ -467,7 +467,7 @@ def KATh5Select(katdata, parms, err, **kwargs):
         err: OErr.OErr()
             Obit error message stack object
         **kwargs:
-            Currently can only pass in targets as a kwarg 
+            Currently can only pass in targets as a kwarg and delay_katdata if doing polcal 
 
     Raises
     ------
@@ -477,16 +477,16 @@ def KATh5Select(katdata, parms, err, **kwargs):
     if kwargs.get('targets'):
         katdata.select(targets=kwargs.get('targets').split(','))
 
+    file_ants = [ant.name for ant in katdata.ants]
     if kwargs.get('dropants'):
         ants_to_remove = kwargs.get('dropants').split(',')
-        file_ants = [ant.name for ant in katdata.ants]
         for ant in ants_to_remove:
             try:
                 file_ants.remove(ant)
             except ValueError:
                 print "Antenna:", ant, "not in observation. Skipping ..."
                 pass
-        katdata.select(ants=file_ants, reset='')
+    katdata.select(ants=file_ants, reset='')
 
     #reducing data selections
     # Tracks only
@@ -609,10 +609,47 @@ def KATh5Select(katdata, parms, err, **kwargs):
         OErr.printErr(err)
         raise KATUnimageableError("Dump rate too small for imaging.")
 
+    # Do selection on delay_katdata if we need to
+    if parms["PolCal"]:
+        kwargs['delay_katdata'].select(ants=file_ants, channels=chan_range, reset='')
+
     #Other errors
     if err.isErr:
         OErr.printErrMsg(err, "Error with h5 file")
 
+def KATGetDelayCal(katdata, h5file):
+    """
+    Try and find the delaycal observation associated with this observation
+    Raise a ValueError for various reasons if we cant find it.
+    Select only the last 'track' scan in the delaycal- which should be the
+    noise diode firing. Also only select auto correlations.
+    Return a properly conditioned katdal object for the delay cal.
+    """
+    try:
+        sb_cbids = katdata.source.telstate.get_range('sdp_capture_block_id', st=0)
+    except KeyError:
+        raise ValueError('Cannot find capture blocks associated with this observation.'
+                             ' Have you used the "full" rdb file?')
+    # Lookup CBIDs in current subarray in reverse order and extract delaycal obs.
+    delay_cbids = [cbid[0] for cbid in sb_cbids[::-1]
+                   if 'calibrate_delays.py' in 
+                   katdata.source.telstate.view(cbid[0])['obs_params']['script_name']]
+    if len(delay_cbids) == 0:
+        raise ValueError('No delay calibration in this schedule block. Cannot do polcal.')
+    # Get the scan we want from the delaycal observation.
+    # And lets do some rudimentary checks that this delay cal is good for what we want.
+    OK = False
+    for cbid in delay_cbids:
+        dc_katdata = katdal.open(h5file, capture_block_id=cbid)
+        # Get the scan we want from the delaycal observation.
+        # And lets do some rudimentary checks that this delay cal is good for what we want
+        # A delaycal has two tracks and the second one should have CompScanLabel='corrected'
+        dc_katdata.select(corrprods='auto', scans='track', compscans='corrected')
+        # Now there should only be the scans we want
+        if len(dc_katdata.scan_indices) > 0:
+            return dc_katdata
+    raise ValueError('Could not find a valid delay calibration for this schedule block.'
+                     ' Cannot do polcal.')
 
 def KATInitTargParms(katdata,parms,err):
     """
@@ -1675,6 +1712,7 @@ def KATSplatandUVFITS(inUV, filename, outDisk, err, logfile=""):
     KATUVFITS(tempUV,filename, outDisk, err, logfile=logfile)
     tempUV.Zap(err)
     return
+
 
 def EVLAUVFITSTab(inUV, filename, outDisk, err, \
               exclude=["AIPS HI", "AIPS AN", "AIPS FQ", "AIPS SL", "AIPS PL"], \
