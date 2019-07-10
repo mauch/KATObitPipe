@@ -145,11 +145,26 @@ def MKContPipeline(files, outputdir, **kwargs):
 
     ####################### Import data into AIPS #####################################################
     # Reuse or nay?
+    sw = katdata.spectral_windows[katdata.spw]
+    # Pick up static flags
+    if sw.band == 'L':
+        sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle')
+        if kwargs.get('flag', None):
+            mess = 'Using static RFI mask in file %s for L-band' % (ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle',)
+            printMess(mess, logFile)
+    elif sw.band == 'UHF':
+        sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle')
+        if kwargs.get('flag', None):
+            mess = 'Using static RFI mask in file %s for UHF-band' % (ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle',)
+            printMess(mess, logFile)
+    else:
+        sflags = np.zeros(sw.num_chans, dtype=np.bool)
+    sflags = sflags[katdata.channels]
+    # Construct a template uvfits file from master template
+    mastertemplate = ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'MKATTemplate.uvtab.gz'
+    outtemplate = nam + '.uvtemp'
     if kwargs.get('reuse'):
-        OTObit.AUcat()
         uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), dataClass, disk, seq, True, err)
-        if parms["PolCal"]:
-            delay_uv = UV.newPAUV("DELAY DATA", EVLAAIPSName(project), delayClass, disk, seq + 1, True, err)
         obsdata = KATH5toAIPS.GetKATMeta(katdata, err)
         # Extract AIPS parameters of the uv data to the metadata
         obsdata["Aproject"] = uv.Aname
@@ -161,40 +176,23 @@ def MKContPipeline(files, outputdir, **kwargs):
         # TODO: Check if the input data has been Hanned.
         doneHann = True
     else:
-        sw = katdata.spectral_windows[katdata.spw]
-        # Pick up static flags
-        if sw.band == 'L':
-            sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle')
-            if kwargs.get('flag', None):
-                mess = 'Using static RFI mask in file %s for L-band' % (ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle',)
-                printMess(mess, logFile)
-        elif sw.band == 'UHF':
-            sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle')
-            if kwargs.get('flag', None):
-                mess = 'Using static RFI mask in file %s for UHF-band' % (ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle',)
-                printMess(mess, logFile)
-        else:
-            sflags = np.zeros(sw.num_chans, dtype=np.bool)
-        sflags = sflags[katdata.channels]
-        # Construct a template uvfits file from master template
-        mastertemplate = ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'MKATTemplate.uvtab.gz'
-        outtemplate = nam + '.uvtemp'
-        if parms["PolCal"]:
-            mess = '\nLoading delay calibration with CBID: %s' % (delay_katdata.obs_params['capture_block_id'],)
-            printMess(mess, logFile)
-            # Load the delay cal observation
-            KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
-            delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delayClass, disk, seq, err)
-            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
-            MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
         mess = '\nLoading UV data with CBID: %s' % (katdata.obs_params['capture_block_id'],)
         printMess(mess, logFile)
         KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
         uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), clss, disk, seq, err)
-        os.remove(outtemplate)
         obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
         MakeIFs.UVMakeIF(uv,8,err,solInt=katdata.dump_period)
 
+    if parms["PolCal"]:
+        mess = '\nLoading delay calibration with CBID: %s' % (delay_katdata.obs_params['capture_block_id'],)
+        printMess(mess, logFile)
+        # Load the delay cal observation
+        KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
+        delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delayClass, disk, seq, err)
+        KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
+        MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
+    
+    os.remove(outtemplate)
     # Print the uv data header to screen.
     uv.Header(err)
     ############################# Set Project Processing parameters ###################################
@@ -267,10 +265,13 @@ def MKContPipeline(files, outputdir, **kwargs):
         if parms["doHann"]:
             uv = KATHann(uv, EVLAAIPSName(project), dataClass, disk, seq, err, \
                       doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
-            if parms["PolCal"]:
-                delay_uv = KATHann(delay_uv, EVLAAIPSName(project), delayClass, disk, seq + 1, err, \
-                           doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
             doneHann = True
+    
+    if parms["PolCal"] and parms["doHann"]:
+        mess = "Hanning delay calibration scan"
+        printMess(mess, logFile)
+        delay_uv = KATHann(delay_uv, EVLAAIPSName(project), delayClass, disk, seq + 1, err, \
+                        doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
 
     if doneHann:
         # Halve channels after hanning.
@@ -500,7 +501,7 @@ def MKContPipeline(files, outputdir, **kwargs):
 
         # Run MKXPhase on delaycal data and attach BP table to UV data
         if parms["PolCal"]:
-            mess = "XYphase bandpass re-calibration"
+            mess = "XYphase bandpass calibration"
             printMess(mess, logFile)
             retCode = KATXPhase(delay_uv, uv, err, logfile=logFile, check=check, debug=debug,
                             doCalib=-1, flagVer=0, doBand=-1, refAnt=parms['refAnt'])
