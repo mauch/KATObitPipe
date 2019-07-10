@@ -80,17 +80,6 @@ def MKContPipeline(files, outputdir, **kwargs):
     clss = "Raw"
     seq = 1
 
-    ############################# Initialise Parameters ##########################################
-    ####### Initialize parameters dictionary ##### 
-    parms = KATInitContParms()
-    parms['PolCal'] = kwargs.get('polcal')
-    parms['XYtarg'] = kwargs.get('XYtarg')
-    ####### User defined parameters ######
-    if kwargs.get('parmFile'):
-        print "parmFile",kwargs.get('parmFile')
-        exec(open(kwargs.get('parmFile')).read())
-        EVLAAddOutFile(os.path.basename(kwargs.get('parmFile')), 'project', 'Pipeline input parameters' )
-
     ############### Initialize katfile object, uvfits object and condition data #########################
     OK = False
     # Open the h5 file as a katfile object
@@ -107,14 +96,39 @@ def MKContPipeline(files, outputdir, **kwargs):
         raise KATUnimageableError("Unable to read KAT HDF5 data in " + str(h5file))
 
     # If we are doing polcal- search for the most recent delaycal observation
-    if parms['PolCal']:
+    if kwargs.get('polcal'):
         delay_katdata = KATGetDelayCal(katdata, h5file)
         kwargs["delay_katdata"] = delay_katdata
 
     #Get calibrator models
-    fluxcals = katpoint.Catalogue(file(FITSDir.FITSdisks[0]+"/"+parms["fluxModel"]))
+    fluxcals = katpoint.Catalogue(file(FITSDir.FITSdisks[0]+"/PERLEY_BUTLER_2013.csv"))
     #Condition data (get bpcals, update names for aips conventions etc)
     KATh5Condition(katdata, fluxcals, err)
+
+    ############################# Initialise Parameters ##########################################
+    ####### Initialize parameters dictionary ##### 
+    parms = KATInitContParms()
+    parms['PolCal'] = kwargs.get('polcal')
+    parms['XYtarg'] = kwargs.get('XYtarg')
+    # Get default XYtarg if it is not set
+    targs = [targ.name for targ in katdata.catalogue.targets]
+    if parms['XYtarg'] is None:
+        GOTTARG = False
+        for targ in ['1934-638', '0408-65']:
+            if targ in targs:
+                parms['XYtarg'] = targ
+                GOTTARG = True
+                break
+        if not GOTTARG:
+            raise RuntimeError('No default targets (1934-638, 0408-65) for XYFix. Cannot run in PolCal mode.')
+    else:
+        if parms['XYtarg'] not in targs:
+            raise RuntimeError('XYtarg target %s not in observation. Cannot run in PolCal mode.' % (parms['XYtarg']))
+    ####### User defined parameters ######
+    if kwargs.get('parmFile'):
+        print "parmFile",kwargs.get('parmFile')
+        exec(open(kwargs.get('parmFile')).read())
+        EVLAAddOutFile(os.path.basename(kwargs.get('parmFile')), 'project', 'Pipeline input parameters' )
 
     ###################### Data selection and static edits ############################################
     # Select data based on static imageable parameters
@@ -132,7 +146,10 @@ def MKContPipeline(files, outputdir, **kwargs):
     ####################### Import data into AIPS #####################################################
     # Reuse or nay?
     if kwargs.get('reuse'):
+        OTObit.AUcat()
         uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), dataClass, disk, seq, True, err)
+        if parms["PolCal"]:
+            delay_uv = UV.newPAUV("DELAY DATA", EVLAAIPSName(project), delayClass, disk, seq + 1, True, err)
         obsdata = KATH5toAIPS.GetKATMeta(katdata, err)
         # Extract AIPS parameters of the uv data to the metadata
         obsdata["Aproject"] = uv.Aname
@@ -163,12 +180,15 @@ def MKContPipeline(files, outputdir, **kwargs):
         mastertemplate = ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'MKATTemplate.uvtab.gz'
         outtemplate = nam + '.uvtemp'
         if parms["PolCal"]:
-            mess = 'Loading auto correlations from delay calibration with CBID: %s' % (delay_katdata.obs_params['capture_block_id'],)
+            mess = '\nLoading delay calibration with CBID: %s' % (delay_katdata.obs_params['capture_block_id'],)
             printMess(mess, logFile)
             # Load the delay cal observation
             KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
             delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delayClass, disk, seq, err)
-            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
+            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
+            MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
+        mess = '\nLoading UV data with CBID: %s' % (katdata.obs_params['capture_block_id'],)
+        printMess(mess, logFile)
         KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
         uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), clss, disk, seq, err)
         os.remove(outtemplate)
@@ -182,15 +202,16 @@ def MKContPipeline(files, outputdir, **kwargs):
     KATGetObsParms(obsdata, katdata, parms, logFile)
 
     ###### Initialise target parameters #####
-    KATInitTargParms(katdata,parms,err)
+    KATInitTargParms(katdata, parms, err)
 
     # Load the outputs pickle jar
     EVLAFetchOutFiles()
 
     OSystem.PAllowThreads(nThreads)   # Allow threads in Obit/oython
     retCode = 0
-
-    maxgap = max(parms["CalAvgTime"],160.*katdata.dump_period)/60.
+    doBand = -1
+    BPVer = 0
+    maxgap = max(parms["CalAvgTime"], 160.*katdata.dump_period)/60.
     ################### Start processing ###############################################################
 
     mess = "Start project "+parms["project"]+" AIPS user no. "+str(AIPS.userno)+\
@@ -246,8 +267,11 @@ def MKContPipeline(files, outputdir, **kwargs):
         if parms["doHann"]:
             uv = KATHann(uv, EVLAAIPSName(project), dataClass, disk, seq, err, \
                       doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
+            if parms["PolCal"]:
+                delay_uv = KATHann(delay_uv, EVLAAIPSName(project), delayClass, disk, seq + 1, err, \
+                           doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
             doneHann = True
-    
+
     if doneHann:
         # Halve channels after hanning.
         parms["selChan"]=int(parms["selChan"]/2)
@@ -346,13 +370,23 @@ def MKContPipeline(files, outputdir, **kwargs):
         if retCode!=0:
             raise  RuntimeError,"Error in Plotting spectrum"
         EVLAAddOutFile(plotFile, 'project', 'Pipeline log file' )
+    
+    if parms["PolCal"]:
+        mess = "XYphase bandpass calibration"
+        printMess(mess, logFile)
+        retCode = KATXPhase(delay_uv, uv, err, logfile=logFile, check=check, debug=debug,
+                            doCalib=-1, flagVer=0, doBand=-1, refAnt=parms['refAnt'])
+        doBand = 1
+        BPVer += 1
+        if retCode!=0:
+            raise RuntimeError, "Error in Xphase calibration"
 
     # delay calibration
     if parms["doDelayCal"] and parms["DCals"] and not check:
         plotFile = fileRoot+"_DelayCal.ps"
         retCode = EVLADelayCal(uv, parms["DCals"], err,  \
                                BChan=parms["delayBChan"], EChan=parms["delayEChan"], \
-                               doCalib=-1, flagVer=0, doBand=-1, \
+                               doCalib=-1, flagVer=0, doBand=doBand, BPVer=BPVer, \
                                solInt=parms["delaySolInt"], smoTime=parms["delaySmoo"],  \
                                refAnts=[parms["refAnt"]], doTwo=parms["doTwo"], 
                                doZeroPhs=parms["delayZeroPhs"], \
@@ -367,14 +401,15 @@ def MKContPipeline(files, outputdir, **kwargs):
             plotFile = fileRoot+"_DelaySpec.ps"
             retCode = EVLASpectrum(uv, parms["BPCal"], parms["plotTime"], maxgap, \
                                    plotFile, parms["refAnt"], err, \
-                                   Stokes=["RR","LL"], doband=-1,          \
+                                   Stokes=["RR","LL"], doband=doBand,          \
                                    check=check, debug=debug, logfile=logFile )
             if retCode!=0:
                 raise  RuntimeError,"Error in Plotting spectrum"
 
     # Bandpass calibration
     if parms["doBPCal"] and parms["BPCals"]:
-        retCode = KATBPCal(uv, parms["BPCals"], err, noScrat=noScrat, solInt1=parms["bpsolint1"], \
+        retCode = KATBPCal(uv, parms["BPCals"], err, doBand=doBand, BPVer=BPVer, newBPVer=0,
+                            noScrat=noScrat, solInt1=parms["bpsolint1"], \
                             solInt2=parms["bpsolint2"], solMode=parms["bpsolMode"], \
                             BChan1=parms["bpBChan1"], EChan1=parms["bpEChan1"], \
                             BChan2=parms["bpBChan2"], EChan2=parms["bpEChan2"], ChWid2=parms["bpChWid2"], \
@@ -392,24 +427,24 @@ def MKContPipeline(files, outputdir, **kwargs):
                                    check=check, debug=debug, logfile=logFile )
             if retCode!=0:
                 raise  RuntimeError,"Error in Plotting spectrum"
+    
 
     # Amp & phase Calibrate
     if parms["doAmpPhaseCal"]:
         plotFile = fileRoot+"_APCal.ps"
         retCode = KATCalAP (uv, [], parms["ACals"], err, PCals=parms["PCals"], 
-                             doCalib=2, doBand=1, BPVer=1, flagVer=0, \
+                             doCalib=2, doBand=1, BPVer=0, flagVer=0, \
                              BChan=parms["ampBChan"], EChan=parms["ampEChan"], \
                              solInt=parms["solInt"], solSmo=parms["solSmo"], ampScalar=parms["ampScalar"], \
                              doAmpEdit=parms["doAmpEdit"], ampSigma=parms["ampSigma"], \
-                             ampEditFG=parms["ampEditFG"], avgPol=parms['XYfix'], \
+                             ampEditFG=parms["ampEditFG"], avgPol=parms["PolCal"], \
                              doPlot=parms["doSNPlot"], plotFile=plotFile,  refAnt=parms["refAnt"], \
                              nThreads=nThreads, noScrat=noScrat, logfile=logFile, check=check, debug=debug)
-        #print parms["ACals"],parms["PCals"]
+
         if retCode!=0:
             raise RuntimeError,"Error calibrating"
 
     # More editing
-
     if parms["doAutoFlag"]:
         mess =  "Post calibration editing:"
         printMess(mess, logFile)
@@ -430,7 +465,7 @@ def MKContPipeline(files, outputdir, **kwargs):
             clist = []
 
         retCode = EVLAAutoFlag (uv, clist, err, flagVer=0, flagTab =2, \
-                                doCalib=2, gainUse=0, doBand=1, BPVer=1,  \
+                                doCalib=2, gainUse=0, doBand=1, BPVer=BPVer,  \
                                 IClip=parms["IClip"], minAmp=parms["minAmp"], timeAvg=parms["timeAvg"], \
                                 doFD=parms["doFirstAFFD"], FDmaxAmp=parms["FDmaxAmp"], FDmaxV=parms["FDmaxV"], \
                                 FDwidMW=parms["FDwidMW"], FDmaxRMS=parms["FDmaxRMS"], \
@@ -454,6 +489,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         printMess(mess, logFile)
         EVLAClearCal(uv, err, doGain=True, doFlag=False, doBP=True, check=check, logfile=logFile)
         OErr.printErrMsg(err, "Error resetting calibration")
+        BPVer = 0
         # Parallactic angle correction?
         if parms["doPACor"]:
             retCode = EVLAPACor(uv, err, \
@@ -461,12 +497,24 @@ def MKContPipeline(files, outputdir, **kwargs):
             if retCode!=0:
                 raise RuntimeError,"Error in Parallactic angle correction"
 
+
+        # Run MKXPhase on delaycal data and attach BP table to UV data
+        if parms["PolCal"]:
+            mess = "XYphase bandpass re-calibration"
+            printMess(mess, logFile)
+            retCode = KATXPhase(delay_uv, uv, err, logfile=logFile, check=check, debug=debug,
+                            doCalib=-1, flagVer=0, doBand=-1, refAnt=parms['refAnt'])
+            BPVer += 1
+        if retCode!=0:
+            raise RuntimeError, "Error in Xphase calibration"
+
+
         # Delay recalibration
         if parms["doDelayCal2"] and parms["DCals"] and not check:
             plotFile = fileRoot+"_DelayCal2.ps"
             retCode = EVLADelayCal(uv, parms["DCals"], err, \
                                    BChan=parms["delayBChan"], EChan=parms["delayEChan"], \
-                                   doCalib=-1, flagVer=0, doBand=-1, \
+                                   doCalib=-1, flagVer=0, doBand=doBand, BPVer=BPVer, \
                                    solInt=parms["delaySolInt"], smoTime=parms["delaySmoo"],  \
                                    refAnts=[parms["refAnt"]], doTwo=parms["doTwo"], \
                                    doZeroPhs=parms["delayZeroPhs"], \
@@ -480,14 +528,15 @@ def MKContPipeline(files, outputdir, **kwargs):
             if parms["doSpecPlot"] and parms["plotSource"]:
                 plotFile = fileRoot+"_DelaySpec2.ps"
                 retCode = EVLASpectrum(uv, parms["BPCal"], parms["plotTime"], maxgap, plotFile, parms["refAnt"], err, \
-                                       Stokes=["RR","LL"], doband=-1,          \
+                                       Stokes=["RR","LL"], doband=doband,          \
                                        check=check, debug=debug, logfile=logFile )
                 if retCode!=0:
                     raise  RuntimeError,"Error in Plotting spectrum"
 
         # Bandpass calibration
         if parms["doBPCal2"] and parms["BPCals"]:
-            retCode = KATBPCal(uv, parms["BPCals"], err, noScrat=noScrat, solInt1=parms["bpsolint1"], \
+            retCode = KATBPCal(uv, parms["BPCals"], err, doBand=doBand, BPVer=BPVer, newBPVer=0, \
+                            noScrat=noScrat, solInt1=parms["bpsolint1"], \
                             solInt2=parms["bpsolint2"], solMode=parms["bpsolMode"], \
                             BChan1=parms["bpBChan1"], EChan1=parms["bpEChan1"], \
                             BChan2=parms["bpBChan2"], EChan2=parms["bpEChan2"], ChWid2=parms["bpChWid2"], \
@@ -506,15 +555,16 @@ def MKContPipeline(files, outputdir, **kwargs):
             if retCode!=0:
                 raise  RuntimeError,"Error in Plotting spectrum"
 
+
         # Amp & phase Recalibrate
         if parms["doAmpPhaseCal2"]:
             plotFile = fileRoot+"_APCal2.ps"
             retCode = KATCalAP (uv, [], parms["ACals"], err, PCals=parms["PCals"], \
-                                 doCalib=2, doBand=1, BPVer=1, flagVer=0, \
+                                 doCalib=2, doBand=1, BPVer=0, flagVer=0, \
                                  BChan=parms["ampBChan"], EChan=parms["ampEChan"], \
                                  solInt=parms["solInt"], solSmo=parms["solSmo"], ampScalar=parms["ampScalar"], \
                                  doAmpEdit=True, ampSigma=parms["ampSigma"], \
-                                 ampEditFG=parms["ampEditFG"], avgPol=parms["XYfix"], \
+                                 ampEditFG=parms["ampEditFG"], avgPol=parms["PolCal"], \
                                  doPlot=parms["doSNPlot"], plotFile=plotFile, refAnt=parms["refAnt"], \
                                  noScrat=noScrat, nThreads=nThreads, logfile=logFile, check=check, debug=debug)
             if retCode!=0:
@@ -525,7 +575,7 @@ def MKContPipeline(files, outputdir, **kwargs):
             mess =  "Post recalibration editing:"
             printMess(mess, logFile)
             retCode = EVLAAutoFlag (uv, [], err, flagVer=0, flagTab=2, \
-                                    doCalib=2, gainUse=0, doBand=1, BPVer=1,  \
+                                    doCalib=2, gainUse=0, doBand=1, BPVer=0,  \
                                     IClip=parms["IClip"], minAmp=parms["minAmp"], timeAvg=parms["timeAvg"], \
                                     doFD=parms["doSecAFFD"], FDmaxAmp=parms["FDmaxAmp"], FDmaxV=parms["FDmaxV"], \
                                     FDwidMW=parms["FDwidMW"], FDmaxRMS=parms["FDmaxRMS"], \
@@ -541,7 +591,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         parms["avgStokes"] = 'HALF'
     if parms["doCalAvg"] == 'Splat':
         retCode = KATCalAvg (uv, avgClass, parms["seq"], parms["CalAvgTime"], err, \
-                              flagVer=2, doCalib=2, gainUse=0, doBand=1, BPVer=1, doPol=False, \
+                              flagVer=2, doCalib=2, gainUse=0, doBand=1, BPVer=0, doPol=False, \
                               avgFreq=parms["avgFreq"], chAvg=parms["chAvg"], Stokes=parms["avgStokes"], \
                               BChan=1, EChan=parms["selChan"] - 1, doAuto=parms["doAuto"], \
                               BIF=parms["CABIF"], EIF=parms["CAEIF"], Compress=parms["Compress"], \
@@ -550,7 +600,7 @@ def MKContPipeline(files, outputdir, **kwargs):
            raise  RuntimeError,"Error in CalAvg"
     elif parms["doCalAvg"] == 'BL':
         retCode = KATBLCalAvg (uv, avgClass, parms["seq"], err, \
-                              flagVer=2, doCalib=2, gainUse=0, doBand=1, BPVer=1, doPol=False, \
+                              flagVer=2, doCalib=2, gainUse=0, doBand=1, BPVer=0, doPol=False, \
                               avgFreq=parms["avgFreq"], chAvg=parms["chAvg"], FOV=parms['FOV'], \
                               maxInt=min(parms["solPInt"],parms["solAInt"]), Stokes=parms["avgStokes"], \
                               BChan=1, EChan=parms["selChan"] - 1, timeAvg=parms["CalAvgTime"], \

@@ -48,7 +48,7 @@ parser.add_option("--katdal_refant", type='str', default='', help='Reference ant
 parser.add_option("--polcal", default=False, action='store_true', help='Switch on polarisation calibration'
 									'Fix the X & Y gains. This will cause the selected target (via --XTYarg) alone'
  									'to be used for delay and bandpass then subsequent gains to be computed with avgPol=True')
-parser.add_option("--XYtarg", default='1934-638', help='Name of target to use to fix the X & Y gains (default is 1934-638')
+parser.add_option("--XYtarg", default=None, help='Name of target to use to fix the X & Y gains (default is 1934-638 or 0408-65)')
 
 (options, katfilenames) = parser.parse_args()
 
