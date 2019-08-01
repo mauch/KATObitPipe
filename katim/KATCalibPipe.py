@@ -391,6 +391,7 @@ def MKContPipeline(files, outputdir, **kwargs):
                                solInt=parms["delaySolInt"], smoTime=parms["delaySmoo"],  \
                                refAnts=[parms["refAnt"]], doTwo=parms["doTwo"], 
                                doZeroPhs=parms["delayZeroPhs"], \
+                               doAvgIF=parms["delayAvgIF"], doAvgPol=parms["delayAvgPol"], \
                                doPlot=parms["doSNPlot"], plotFile=plotFile, \
                                nThreads=nThreads, noScrat=noScrat, \
                                logfile=logFile, check=check, debug=debug)
@@ -519,6 +520,7 @@ def MKContPipeline(files, outputdir, **kwargs):
                                    solInt=parms["delaySolInt"], smoTime=parms["delaySmoo"],  \
                                    refAnts=[parms["refAnt"]], doTwo=parms["doTwo"], \
                                    doZeroPhs=parms["delayZeroPhs"], \
+                                   doAvgIF=parms["delayAvgIF"], doAvgPol=parms["delayAvgPol"], \
                                    doPlot=parms["doSNPlot"], plotFile=plotFile, \
                                    nThreads=nThreads, noScrat=noScrat, \
                                    logfile=logFile, check=check, debug=debug)

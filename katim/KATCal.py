@@ -138,6 +138,8 @@ def KATInitContParms():
     parms["delayZeroPhs"] =  False      # Zero phase in Delay solutions?
     parms["delayBChan"]   =  None       # first channel to use in delay solutions
     parms["delayEChan"]   =  None       # highest channel to use in delay solutions
+    parms["delayAvgIF"]   =  False      # Average the IFs during delay calibration
+    parms["delayAvgPol"]  =  False      # Average the H and V pols during delay calibration
 
     # Bandpass Calibration?
     parms["doBPCal"]    =    True       # Determine Bandpass calibration
@@ -2239,6 +2241,7 @@ def KATGetCalModel(uv, parms, fileroot, err, logFile='', sefd=1000., check=False
 def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
                      timeRange=[0.,0.], FreqID=1, doCalib=-1, gainUse=0, minSNR=5.0, \
                      refAnts=[0], doBand=-1, BPVer=0, flagVer=-1, doTwo=True, doZeroPhs=False, \
+                     doAvgIF=False, doAvgPol=False, \
                      doPlot=False, plotFile="./DelayCal.ps", \
                      nThreads=1, noScrat=[], logfile='', check=False, debug=False):
     """
@@ -2267,6 +2270,8 @@ def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
     * flagVer    = Input Flagging table version
     * doTwo      = If True, use one and two baseline combinations
       for delay calibration, else only one baseline
+    * doAvgIF    = Average the IF during delay calibration
+    * doAvgPol   = Average the polarizations
     * doPlot     = If True make plots of SN gains
     * plotFile   = Name of postscript file for plots
     * nThreads   = Max. number of threads to use
@@ -2310,7 +2315,8 @@ def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
     calib.noScrat   = noScrat
     calib.nThreads  = nThreads
     calib.doTwo     = True
-    
+    calib.avgIF     = doAvgIF
+    calib.avgPol    = doAvgPol
     # Loop over calibrators
     for DlyCal in DlyCals:
         calib.Sources[0]= DlyCal["Source"]
@@ -2331,7 +2337,6 @@ def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
         calib.modelFlux = DlyCal["CalModelFlux"]
         calib.modelPos  = DlyCal["CalModelPos"]
         calib.modelParm = DlyCal["CalModelParm"]
-        
         if debug:
             calib.prtLv =6
             calib.i
