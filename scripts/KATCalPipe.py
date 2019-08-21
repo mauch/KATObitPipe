@@ -3,29 +3,6 @@ import sys
 from katim import KATCalibPipe
 from optparse import OptionParser
 
-S3_URL = 'http://stgr2.sdp.mkat.chpc.kat.ac.za:8081/link/s3'
-S3_HEAD = {'Content-Type': 'application/json;charset=UTF-8', 'Accept': 'application/json, text/plain, */*'}
-
-def get_archive(katfilenames):
-	"""If the names listed in katfilenames don't exist
-	try and find them in the archive and download them locally.
-	Then return references to existent files on the local disk.
-	"""
-	import requests
-
-	file_refs = []
-	for filename in katfilenames:
-		if filename.startswith('s3'):
-			res = requests.post(S3_URL, headers=S3_HEAD, data='{"s3_ref":"%s","ref_key":"Nope"}'%(filename,))
-			url = res.json()['url']
-			res1 = requests.get(url)
-			outfile = filename.split('/')[-1]
-			open(outfile, 'wb').write(res1.content)
-			file_refs.append(outfile)
-		else:
-			file_refs.append(filename)
-	return file_refs
-
 usage = "%prog [options] mvffileToImage"
 description = "Calibrate an MVF file."
 parser = OptionParser( usage=usage, description=description)
@@ -55,8 +32,6 @@ parser.add_option("--XYtarg", default=None, help='Name of target to use to fix t
 if len(katfilenames) == 0:
     parser.print_help()
     sys.exit()
-
-katfilenames = get_archive(katfilenames)
 
 kwargs = {}
 for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'polcal', 'XYtarg']:

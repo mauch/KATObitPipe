@@ -35,13 +35,27 @@ def MKContPipeline(files, outputdir, **kwargs):
     parmFile : string, optional
         Overwrite the default imaging parameters using this parameter file.
     """
-    #if len(files) > 1:
-    #    raise TooManyKatfilesException('Processing multiple katfiles are not currently supported')
-    # Onle be concatenated if we have to be
     if len(files) == 1:
         h5file = files[0]
     else:
         h5file = files
+    ############### Initialize katfile object #########################
+    OK = False
+    # Open the h5 file as a katfile object
+    try:
+        #open katfile and perform selection according to kwargs
+        katdal_ref_ant = kwargs.get('katdal_refant', '')
+        katdata = katfile.open(h5file, ref_ant=katdal_ref_ant)
+        OK = True
+    except Exception, exception:
+        print exception
+    if not OK:
+        raise KATUnimageableError("Unable to read MVF data in " + str(h5file))
+
+    # If we are doing polcal- search for the most recent delaycal observation
+    if kwargs.get('polcal'):
+        delay_katdata = KATGetDelayCal(katdata, h5file)
+        kwargs["delay_katdata"] = delay_katdata   
 
     # Die gracefully if we cannot write to the output area...
     if not os.path.exists(outputdir):
@@ -52,8 +66,8 @@ def MKContPipeline(files, outputdir, **kwargs):
     err = OErr.OErr()
 
     #################### Initialize filenames #######################################################
-    fileRoot      = os.path.join(outputdir, os.path.basename(os.path.splitext(files[0])[0])) # root of file name
-    logFile       = fileRoot+".log"   # Processing log file
+    fileRoot      = katdata.obs_params.get('capture_block_id', katdata.experiment_id) # root of file name
+    logFile       = fileRoot + ".log"   # Processing log file
     avgClass      = ("UVAv")[0:6]  # Averaged data AIPS class
     manifestfile  = outputdir + '/manifest.pickle'
 
@@ -76,29 +90,11 @@ def MKContPipeline(files, outputdir, **kwargs):
     AIPS.userno = user
     disk = 1
     fitsdisk = 0
-    nam = os.path.basename(os.path.splitext(files[0])[0])[0:10]
+    nam = fileRoot[:10]
     clss = "Raw"
     seq = 1
 
-    ############### Initialize katfile object, uvfits object and condition data #########################
-    OK = False
-    # Open the h5 file as a katfile object
-    try:
-        #open katfile and perform selection according to kwargs
-        katdal_ref_ant = kwargs.get('katdal_refant', '')
-        katdata = katfile.open(h5file, ref_ant=katdal_ref_ant)
-        OK = True
-    except Exception, exception:
-        print exception
-    if not OK:
-        OErr.PSet(err)
-        OErr.PLog(err, OErr.Fatal, "Unable to read KAT HDF5 data in " + str(h5file))
-        raise KATUnimageableError("Unable to read KAT HDF5 data in " + str(h5file))
-
-    # If we are doing polcal- search for the most recent delaycal observation
-    if kwargs.get('polcal'):
-        delay_katdata = KATGetDelayCal(katdata, h5file)
-        kwargs["delay_katdata"] = delay_katdata
+    ############### Condition data #########################
 
     #Get calibrator models
     fluxcals = katpoint.Catalogue(file(FITSDir.FITSdisks[0]+"/PERLEY_BUTLER_2013.csv"))
@@ -128,7 +124,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     if kwargs.get('parmFile'):
         print "parmFile",kwargs.get('parmFile')
         exec(open(kwargs.get('parmFile')).read())
-        EVLAAddOutFile(os.path.basename(kwargs.get('parmFile')), 'project', 'Pipeline input parameters' )
+        EVLAAddOutFile(os.path.basename(kwargs.get('parmFile')), 'project', 'Pipeline input parameters')
 
     ###################### Data selection and static edits ############################################
     # Select data based on static imageable parameters

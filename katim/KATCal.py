@@ -369,9 +369,9 @@ def KATh5Condition(katdata, caldata, err):
         #Get the nearest calibrator in caldata.
         fluxcal,offset=caldata.closest_to(targ)
         # Update the calibrator flux model
-        if offset*3600.0 < 200.0:        # 200.0 arcseconds should be close enough...
+        if offset*3600.0 < 20.0:        # 20.0 arcseconds should be close enough...
             targ.flux_model = fluxcal.flux_model
-            if 'bpcal' in targ.tags:
+            if targ.name != fluxcal.name:
                 targ.name = fluxcal.name
         else:                            # Not a bandpass calibrator
             if 'bpcal' in targ.tags: targ.tags.remove('bpcal')
@@ -379,11 +379,14 @@ def KATh5Condition(katdata, caldata, err):
             havebpcal=True
     #Look for flux models only if we don't have a bandpass calibrator
     if not havebpcal:
-        [targ.tags.append('bpcal') for targ in katdata.catalogue.targets if targ.flux_model]
-        msg = "WARNING: No bpcal found in target tags! Adding target %s to list of bandpass calibrators. "%(targ.name)
-        OErr.PLog(err, OErr.Info, msg)
-        OErr.printErr(err)
-
+        callookup = [targ.name for targ in caldata.targets]
+        [targ.tags.append('bpcal') for targ in katdata.catalogue.targets if targ.name in callookup]
+        bpcals = [targ.name for targ in katdata.catalogue.targets if 'bpcal' in targ.tags]
+        if len(bpcals) > 0:
+            msg = "No bpcal found in any target tags! Adding bpcal to targets: %s. "%(str(bpcals))
+            OErr.PLog(err, OErr.Warn, msg)
+            OErr.printErr(err)
+            print msg
 
 def KATh5Select(katdata, parms, err, **kwargs):
     """This function will modify the katdata object.
@@ -506,7 +509,10 @@ def KATh5Select(katdata, parms, err, **kwargs):
         #Ensure number of channels divides into number of IFs
         first_chan=first_chan+(chan_after_ifs//2)
         last_chan=last_chan-(chan_after_ifs-(chan_after_ifs//2))
-        print "Trimming %s channnels to divide band into 8 even sized IFs"% (chan_after_ifs,)
+        msg = "Trimming %s channnels to divide band into 8 even sized IFs"% (chan_after_ifs,)
+        OErr.PLog(err, OErr.Info, msg)
+        OErr.printErr(err)
+        print msg
 
     parms["BChDrop"]=first_chan
     parms["EChDrop"]=katdata.shape[1]-last_chan
@@ -515,7 +521,10 @@ def KATh5Select(katdata, parms, err, **kwargs):
         raise RuntimeError("Requested channel range outside data set boundaries. Set channels in the range [0,%s]" % (katdata.shape[1]-1,))
     chan_range = slice(first_chan, last_chan + 1)
 
-    print "\nChannel range %s through %s." % (first_chan, last_chan)
+    msg = "\nChannel range %s through %s." % (first_chan, last_chan)
+    OErr.PLog(err, OErr.Info, msg)
+    OErr.printErr(err)
+    print msg
     katdata.select(channels=chan_range)
 
     # More than 4 antennas
