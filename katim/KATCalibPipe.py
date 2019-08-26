@@ -92,7 +92,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     AIPS.userno = user
     disk = 1
     fitsdisk = 0
-    nam = fileRoot[:10]
+    nam = katdata.obs_params.get('capture_block_id', katdata.experiment_id)[:10]
     clss = "Raw"
     seq = 1
 
