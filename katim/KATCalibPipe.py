@@ -66,7 +66,9 @@ def MKContPipeline(files, outputdir, **kwargs):
     err = OErr.OErr()
 
     #################### Initialize filenames #######################################################
-    fileRoot      = katdata.obs_params.get('capture_block_id', katdata.experiment_id) # root of file name
+    fileRoot      = os.path.join(outputdir,
+                                 katdata.obs_params.get('capture_block_id', 
+                                                        katdata.experiment_id)) # root of file name
     logFile       = fileRoot + ".log"   # Processing log file
     avgClass      = ("UVAv")[0:6]  # Averaged data AIPS class
     manifestfile  = outputdir + '/manifest.pickle'
