@@ -2,7 +2,7 @@
 Optional input is contrast percentage.
 """
 
-import pyfits
+from astropy.io import fits as pyfits
 import matplotlib.pyplot as plt
 from matplotlib.colors import BoundaryNorm
 import os, sys

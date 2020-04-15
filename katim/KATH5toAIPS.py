@@ -47,13 +47,14 @@ import UV, UVVis, OErr, UVDesc, Table, History
 from OTObit import day2dhms
 import numpy
 import itertools
-import pyfits
+from astropy.io import fits as pyfits
 import multiprocessing
 import concurrent.futures
 import dask
 import dask.array as da
 import numba
 from katsdpsigproc.rfi.twodflag import SumThresholdFlagger
+
 
 def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
               calInt=1.0, static=None, **kwargs):
@@ -89,6 +90,10 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
 
     # Extract metadata
     meta = GetKATMeta(katdata, err)
+
+    # TODO: Fix this all up so that the below isn't the case!
+    if meta["products"].size != meta["nants"] * meta["nants"] * 4:
+        raise ValueError("Only full stokes and all correlation products are supported.")
 
     # Extract AIPS parameters of the uv data to the metadata
     meta["Aproject"] = outUV.Aname
@@ -133,7 +138,7 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     # History
     outHistory = History.History("outhistory", outUV.List, err)
     outHistory.Open(History.READWRITE, err)
-    outHistory.TimeStamp("Convert KAT7 HDF 5 data to Obit", err)
+    outHistory.TimeStamp("Convert MeerKAT MVF data to Obit", err)
     outHistory.WriteRec(-1,"datafile = "+katdata.name.encode(), err)
     outHistory.WriteRec(-1,"calInt   = "+str(calInt), err)
     outHistory.Close(err)
@@ -570,10 +575,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
     visshape = nchan * nstok * 3
     count = 0.0
     # Get IO buffers as numpy arrays
-    buff =  numpy.frombuffer(outUV.VisBuf,dtype=numpy.float32)
-    # Allocate a single visibility array
-    thisvis = numpy.empty(visshape, dtype=numpy.float32)
-
+    buff =  numpy.frombuffer(outUV.VisBuf, dtype=numpy.float32)
     #Set up a flagger if needs be
     if flag:
         flagger = SumThresholdFlagger(outlier_nsigma=4.5, freq_chunks=7,
@@ -617,6 +619,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             scan_slices[-1] = slice(scan_slices[-1].start, katdata.shape[0], 1)
         else:
             scan_slices = [slice(QUACK * timeav, katdata.shape[0])]
+
         # Number of integrations
         num_ints = katdata.timestamps.shape[0] - QUACK * timeav
         msg = "Scan:%4d Int: %4d %16s Start %s"%(scan, num_ints, target.name,
@@ -628,7 +631,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             tm = katdata.timestamps[sl]
             nint = tm.shape[0]
             load(katdata, numpy.s_[sl.start:sl.stop, :, :], scan_vs[:nint], scan_wt[:nint], scan_fg[:nint], err)
-
             # Make sure we've reset the weights
             wt = scan_wt[:nint]
             if doweight==False:
@@ -637,9 +639,9 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             fg = scan_fg[:nint]
             if doflags==False:
                 fg[:] = False
+            if static is not None:
+                fg[:, :, blmask] |= static[numpy.newaxis, :, numpy.newaxis]
             if flag:
-                if static is not None:
-                    fg[:, :, blmask] |= static[numpy.newaxis, :, numpy.newaxis]
                 fg |= flag_data(vs, fg, flagger)
             if timeav>1:
                 vs, wt, fg, tm, _ = averager.average_visibilities(vs, wt, fg, tm, katdata.channel_freqs, timeav=int(timeav), chanav=1)
@@ -666,7 +668,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
 
             #Get random parameters for this scan
             rp = get_random_parameters(idb, b, uvw_coordinates, tm, suid)
-
             # Loop over integrations
             for iint in range(0, nint):
                 # Fill the buffer for this integration
@@ -688,12 +689,12 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
         OErr.printErrMsg(err, "Error closing data")
     # end ConvertKATData
 
-
-def MakeTemplate(inuv,outuv,numchans,nvispio=1024):
+def MakeTemplate(inuv, outuv, katdata):
     """
     Construct a template file with the correct channel range and write it to outuv.
     """
-    #numchans=len(katdata.channel_freqs)
+    numchans = len(katdata.channel_freqs)
+    nvispio = len(numpy.unique([(cp[0][:-1] + cp[1][:-1]).upper() for cp in katdata.corr_products]))
     uvfits = pyfits.open(inuv)
     #Resize the visibility table
     vistable = uvfits[1].columns
@@ -707,8 +708,7 @@ def MakeTemplate(inuv,outuv,numchans,nvispio=1024):
 
     newuvfits = pyfits.HDUList([uvfits[0],vishdu,uvfits[2],uvfits[3],uvfits[4],uvfits[5],uvfits[6]])
     #Add nvispio rows
-
-    newuvfits.writeto(outuv,clobber=True)
+    newuvfits.writeto(outuv, overwrite=True)
 
 def flag_data(vs,fg,flagger):
     """

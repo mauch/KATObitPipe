@@ -23,7 +23,7 @@ import itertools
 import datetime
 import xml.dom.minidom
 import katpoint
-import katdal as katfile
+import katdal
 from ObitTalkUtil import FITSDir
 from KATImExceptions import KATUnimageableError
 
@@ -138,6 +138,8 @@ def KATInitContParms():
     parms["delayZeroPhs"] =  False      # Zero phase in Delay solutions?
     parms["delayBChan"]   =  None       # first channel to use in delay solutions
     parms["delayEChan"]   =  None       # highest channel to use in delay solutions
+    parms["delayAvgIF"]   =  False      # Average the IFs during delay calibration
+    parms["delayAvgPol"]  =  False      # Average the H and V pols during delay calibration
 
     # Bandpass Calibration?
     parms["doBPCal"]    =    True       # Determine Bandpass calibration
@@ -326,63 +328,7 @@ def KATGetObsParms(obsdata, katdata, parms, logFile):
 
     # Create the editlist array for static flags (on instantiation it contains a flag of the middle channel).
     editList = KAT7EditList(parms["selChan"])
-    parms["editList"]     = parms["editList"] + editList
-
-    # Update the editlist array with the static flags defined in parms["staticflags"]
-    # Only for wideband !!
-    bandwidth = katdata.channel_freqs[0] - katdata.channel_freqs[-1]
-    if bandwidth>100e6:
-        staticflagfile = ObitTalkUtil.FITSDir.FITSdisks[parms["fitsdisk"]]+parms["staticflags"]
-        if os.path.exists(staticflagfile):
-                parms["editList"]=parms["editList"] + KATGetStaticFlags(katdata,staticflagfile)
-    
-    # Update frequency dependent parameters
-    KATInitContFQParms(katdata, parms)
-
-    # Get bad antennas and update editlist with these
-    if parms["doBadAnt"]:
-        badants = KATGetBadAnts(obsdata,(parms["BChDrop"],-parms["EChDrop"]))
-        for badant in badants:
-            mess = "Flagging "+obsdata['antLookup'].keys()[obsdata['antLookup'].values().index(badant['Ant'][0])]
-            printMess(mess,logFile)
-        parms["editList"]=parms["editList"] + badants
-
-    return parms
-
-def MKATGetObsParms(obsdata, katdata, parms, logFile):
-    """
-    Initialise parameters derived from the metadata in the h5 file.
-
-    Inputs:
-    obsdata: dictionary containing observational parameters derived in KATH5toAIPS
-    parms: parameter dictionary
-    Returns:
-    parms: updates parameter dictionary
-    """
-
-    # Observation parameters
-    parms["selChan"]       = obsdata["numchan"]       # Selected number of channels, def = first
-    parms["project"]       = obsdata["Aproject"]      # Project name (12 char or less, used as AIPS Name)
-    parms["dataClass"]     = obsdata["Aclass"]        # AIPS class of raw uv data
-    parms["disk"]          = obsdata["Adisk"]
-    parms["KAT7Freq"]      = obsdata["centerfreq"]    # Representive frequency
-    parms["KAT7Cfg"]       = obsdata["corrmode"]      # KAT-7 correlator configuraton
-    parms["calInt"]        = obsdata["calInt"]        # Calibration table interval (min)
-    parms["seq"]           = obsdata["Aseq"]          # Sequence number for AIPS files
-    parms["fitsdisk"]      = obsdata["fitsdisk"]
-
-    # Get the longest baseline
-    antennas = obsdata["katdata"].ants
-    longBline = 0.0
-    for ant1,ant2 in itertools.combinations(antennas,2):
-        thisBline=np.linalg.norm(ant1.baseline_toward(ant2))
-        if thisBline>longBline:
-            longBline=thisBline
-    parms["longBline"] = longBline
-
-    # Create the editlist array for static flags (on instantiation it contains a flag of the middle channel).
-    editList = KAT7EditList(parms["selChan"])
-    parms=MKATInitContFQParms(katdata, parms)
+    parms=KATInitContFQParms(katdata, parms)
     # Get bad antennas and update editlist with these
     if parms["doBadAnt"]:
         badants = KATGetBadAnts(obsdata,(0,len(katdata.channel_freqs)))
@@ -423,9 +369,9 @@ def KATh5Condition(katdata, caldata, err):
         #Get the nearest calibrator in caldata.
         fluxcal,offset=caldata.closest_to(targ)
         # Update the calibrator flux model
-        if offset*3600.0 < 200.0:        # 200.0 arcseconds should be close enough...
+        if offset*3600.0 < 20.0:        # 20.0 arcseconds should be close enough...
             targ.flux_model = fluxcal.flux_model
-            if 'bpcal' in targ.tags:
+            if targ.name != fluxcal.name:
                 targ.name = fluxcal.name
         else:                            # Not a bandpass calibrator
             if 'bpcal' in targ.tags: targ.tags.remove('bpcal')
@@ -433,14 +379,16 @@ def KATh5Condition(katdata, caldata, err):
             havebpcal=True
     #Look for flux models only if we don't have a bandpass calibrator
     if not havebpcal:
-        [targ.tags.append('bpcal') for targ in katdata.catalogue.targets if targ.flux_model]
-        msg = "WARNING: No bpcal found in target tags! Adding target %s to list of bandpass calibrators. "%(targ.name)
-        OErr.PLog(err, OErr.Info, msg)
-        OErr.printErr(err)
+        callookup = [targ.name for targ in caldata.targets]
+        [targ.tags.append('bpcal') for targ in katdata.catalogue.targets if targ.name in callookup]
+        bpcals = [targ.name for targ in katdata.catalogue.targets if 'bpcal' in targ.tags]
+        if len(bpcals) > 0:
+            msg = "No bpcal found in any target tags! Adding bpcal to targets: %s. "%(str(bpcals))
+            OErr.PLog(err, OErr.Warn, msg)
+            OErr.printErr(err)
+            print msg
 
-
-
-def MKATh5Select(katdata, parms, err, **kwargs):
+def KATh5Select(katdata, parms, err, **kwargs):
     """This function will modify the katdata object.
     This function is used to select a subset of targets and scans on the katdata object. 
     These selections attenuate the 'view' of the katdata object to only show data that 
@@ -468,7 +416,7 @@ def MKATh5Select(katdata, parms, err, **kwargs):
         err: OErr.OErr()
             Obit error message stack object
         **kwargs:
-            Currently can only pass in targets as a kwarg 
+            Currently can only pass in targets as a kwarg and delay_katdata if doing polcal 
 
     Raises
     ------
@@ -478,16 +426,16 @@ def MKATh5Select(katdata, parms, err, **kwargs):
     if kwargs.get('targets'):
         katdata.select(targets=kwargs.get('targets').split(','))
 
+    file_ants = [ant.name for ant in katdata.ants]
     if kwargs.get('dropants'):
         ants_to_remove = kwargs.get('dropants').split(',')
-        file_ants = [ant.name for ant in katdata.ants]
         for ant in ants_to_remove:
             try:
                 file_ants.remove(ant)
             except ValueError:
                 print "Antenna:", ant, "not in observation. Skipping ..."
                 pass
-        katdata.select(ants=file_ants, reset='')
+    katdata.select(ants=file_ants, reset='')
 
     #reducing data selections
     # Tracks only
@@ -510,7 +458,7 @@ def MKATh5Select(katdata, parms, err, **kwargs):
 
     # If we are going to do flagging on import- then don't select cal_rfi
     if kwargs.get('flag'):
-        katdata.select(flags='static,cam,data_lost,ingest_rfi,predicted_rfi', reset='')
+        katdata.select(flags='cam,data_lost,ingest_rfi,predicted_rfi', reset='')
 
     included_targets = []
     included_bpcals = []
@@ -561,7 +509,10 @@ def MKATh5Select(katdata, parms, err, **kwargs):
         #Ensure number of channels divides into number of IFs
         first_chan=first_chan+(chan_after_ifs//2)
         last_chan=last_chan-(chan_after_ifs-(chan_after_ifs//2))
-        print "Trimming %s channnels to divide band into 8 even sized IFs"% (chan_after_ifs,)
+        msg = "Trimming %s channnels to divide band into 8 even sized IFs"% (chan_after_ifs,)
+        OErr.PLog(err, OErr.Info, msg)
+        OErr.printErr(err)
+        print msg
 
     parms["BChDrop"]=first_chan
     parms["EChDrop"]=katdata.shape[1]-last_chan
@@ -570,7 +521,10 @@ def MKATh5Select(katdata, parms, err, **kwargs):
         raise RuntimeError("Requested channel range outside data set boundaries. Set channels in the range [0,%s]" % (katdata.shape[1]-1,))
     chan_range = slice(first_chan, last_chan + 1)
 
-    print "\nChannel range %s through %s." % (first_chan, last_chan)
+    msg = "\nChannel range %s through %s." % (first_chan, last_chan)
+    OErr.PLog(err, OErr.Info, msg)
+    OErr.printErr(err)
+    print msg
     katdata.select(channels=chan_range)
 
     # More than 4 antennas
@@ -610,9 +564,47 @@ def MKATh5Select(katdata, parms, err, **kwargs):
         OErr.printErr(err)
         raise KATUnimageableError("Dump rate too small for imaging.")
 
+    # Do selection on delay_katdata if we need to
+    if parms["PolCal"]:
+        kwargs['delay_katdata'].select(ants=file_ants, channels=chan_range, 
+                                       flags='cam,data_lost,ingest_rfi,predicted_rfi', reset='')
+
     #Other errors
     if err.isErr:
         OErr.printErrMsg(err, "Error with h5 file")
+
+def KATGetDelayCal(katdata, h5file):
+    """
+    Try and find the delaycal observation associated with this observation
+    Raise a ValueError for various reasons if we cant find it.
+    Select only the last 'track' scan in the delaycal- which should be the
+    noise diode firing.
+    Return a properly conditioned katdal object for the delay cal.
+    """
+    try:
+        sb_cbids = katdata.source.telstate.get_range('sdp_capture_block_id', st=0)
+    except KeyError:
+        raise ValueError('Cannot find capture blocks associated with this observation.'
+                             ' Have you used the "full" rdb file?')
+    # Lookup CBIDs in current subarray in reverse order and extract delaycal obs.
+    delay_cbids = [cbid[0] for cbid in sb_cbids[::-1]
+                   if 'calibrate_delays.py' in 
+                   katdata.source.telstate.view(cbid[0])['obs_params']['script_name']]
+    if len(delay_cbids) == 0:
+        raise ValueError('No delay calibration in this schedule block. Cannot do polcal.')
+    # Get the scan we want from the delaycal observation.
+    # And lets do some rudimentary checks that this delay cal is good for what we want.
+    OK = False
+    for cbid in delay_cbids:
+        dc_katdata = katdal.open(h5file, capture_block_id=cbid)
+        # Get the scan we want from the delaycal observation.
+        # A delaycal has two tracks and the second one should have CompScanLabel='corrected'
+        dc_katdata.select(scans='track', compscans='corrected')
+        # Now there should only be the scans we want
+        if len(dc_katdata.scan_indices) > 0:
+            return dc_katdata
+    raise ValueError('Could not find a valid delay calibration for this schedule block.'
+                     ' Cannot do polcal.')
 
 def KATInitTargParms(katdata,parms,err):
     """
@@ -624,11 +616,8 @@ def KATInitTargParms(katdata,parms,err):
     # Check if user has supplied them
     if len(parms["BPCal"])>0:
         bpcal = [katdata.catalogue[cal] for cal in parms["BPCal"] if cal is not None]
-    elif parms['XYfix']:
+    elif parms['PolCal']:
         alltargs = [katdata.catalogue.targets[cal].name for cal in katdata.target_indices]
-        # Bomb out if the user has selected a target that isn't in the file
-        if parms['XYtarg'] not in alltargs:
-            raise RuntimeError('Target %s not in observation. Cannot run in XYfix mode.' % (parms['XYtarg']))
         bpcal = [katdata.catalogue.targets[cal] for cal in katdata.target_indices if katdata.catalogue.targets[cal].name == parms['XYtarg']]
         parms['BPCal'] = [targ.name for targ in bpcal]
     else:
@@ -714,8 +703,8 @@ def KATInitTargParms(katdata,parms,err):
 
     # Delay Calibrators
     parms["DCals"]= parms.get("DCals",[])
-    # Ony delay on XYtarg if we do XYfix
-    if parms['XYfix']:
+    # Ony delay on XYtarg if we do PolCal
+    if parms['PolCal']:
         parms["DCals"] = parms["BPCals"]
     else:
         if not parms["DCals"]:
@@ -766,28 +755,6 @@ def KATGetStaticFlags(katdata,staticflagfile):
                     editlist.append(editdict)
     return(editlist)
 
-def MKATGetStaticFlags():
-
-    """
-    Construct a list of static flags.
-
-    staticflagfile   = path to file containing list of frequency ranges to reject
-    katdata          = the KAT7 metadata
-
-    returns: a properly formattted list of edit dictionaries for use with the kat-7 pipeline
-    """
-    flag_r = [(168,182),(306,320),(330,540),(560,582),(1506,1527),(1531,1550),(1554,1574),(1675,1699),(1726,1754),(1775,1795) \
-                ,(1816,1841),(1856,1895),(1917,1932),(1969,1995),(2020,2044),(2700,2716),(2920,2949),(2959,2984),(2993,3016) \
-                ,(3033,3051),(3215,3391),(3439,3460),(3475,3503),(3550,3576),(3578,3601),(3686,3700)]
-    #flag_r = [(168,2100),(2700,2716),(2920,2949),(2959,2984),(2993,3016) \
-                #,(3033,3051),(3215,3391),(3439,3460),(3475,3503),(3550,3576),(3578,3601),(3686,3700) ]
-    editlist=[]
-    for flag in flag_r:
-        editdict={"timer":("0/00:00:0.0","5/00:00:0.0"),"Ant":[0,0],"IFs":[1,1],"Chans":[flag[0]-10,flag[1]+10], "Stokes":'1111',"Reason": "Static Flags"}
-        editlist.append(editdict)
-    
-
-    return(editlist)
 
 def KATGetBadAnts(obsdata,specrange):
     """
@@ -857,107 +824,8 @@ def KAT7EditList(numchannels):
         ]
     return editlist
 
+
 def KATInitContFQParms(katdata,parms):
-    """
-    Initialize KAT continuum pipeline frequency dependent parameters
-
-    Some values only set if None on input
-    katdata    = katfile object
-    parms      = Project parameters, modified on output
-    """
-    ################################################################
-    refFreq   = parms["KAT7Freq"]
-    nchan     = parms["selChan"]
-    fracstart = parms["begChanFrac"]
-    fracend   = parms["endChanFrac"]
-
-    BChanFracDrop = nchan*fracstart
-    EChanFracDrop = nchan*fracend
-
-    # Get the beginning and end channels to drop.
-    BChDrop,EChDrop = MKATGetContChan(parms["editList"],BChanFracDrop,EChanFracDrop,nchan)
-    bandwidth = katdata.channel_freqs[0] - katdata.channel_freqs[-1]
-
-    antSize   = parms["antSize"]
-    blSize    = parms["longBline"]
-    doHann    = parms["doHann"]
-
-    # Delay channels
-    if parms["delayBChan"] == None:
-        parms["delayBChan"] =  1              # first channel to use in delay solutions
-    if parms["delayEChan"] == None:
-        parms["delayEChan"] =  0  # highest channel to use in delay solutions
-
-    # BPCal channels
-    if parms["bpBChan2"] == None:
-        parms["bpBChan2"] = 1
-    if parms["bpEChan2"] == None:
-        parms["bpEChan2"] = 0
-
-    # Amp cal channels
-    if parms["doAmpPhaseCal"]==None:
-        parms["doAmpPhaseCal"] = True                            # Amplitude/phase calibration
-    parms["ampBChan"]  =  1                                      # first channel to use in A&P solutions
-    parms["ampEChan"]  =  0                                      # highest channel to use in A&P solutions
-    parms["doAmpEdit"] =  True                                   # Edit/flag on the basis of amplitude solutions
-    parms["ampSigma"]  =  20.0                                   # Multiple of median RMS about median gain to clip/flag
-    # Should be fairly large
-    parms["ampEditFG"] =  2                                      # FG table to add flags to, <=0 -> no FG entries
-
-    if parms["BChDrop"]== None:
-        parms["BChDrop"]=BChDrop
-    if parms["EChDrop"]== None:
-        parms["EChDrop"]=EChDrop
-
-    # Ipol clipping levels
-    if parms["IClip"]==None:
-        if refFreq<1.0e9:
-            parms["IClip"] = [20000.,0.1]  # Allow Cygnus A
-        else:
-            parms["IClip"] = [200.,0.1]    # Covers most real sources
-        # end IPol clipping
-    if (parms["FDmaxAmp"]==None):
-        parms["FDmaxAmp"]    = parms["IClip"][0]     # Maximum average amplitude (Jy)
-
-
-    if parms["FDbaseSel"]==None:
-        parms["FDbaseSel"] = [1, 0, 1, 0]
-    # Set spectral baseline for FD1 flagging ignoring end channels
-    if parms["FD1baseSel"]==None:
-        parms["FD1baseSel"] = parms["FDbaseSel"]
-
-    # Channel averaging before imaging
-    # Can probably set this automatically to accomodate bandwidth smearing constraints later on..
-    if parms["chAvg"] == None:
-        if nchan<=1024:
-            parms["chAvg"] =         2
-        else:
-            parms["chAvg"] =         2
-    if parms["avgFreq"] == None:
-        parms["avgFreq"] =       1
-
-    if parms["doMB"] == None:
-        if bandwidth>50e6:                               # Wideband
-            parms["doMB"] = True
-            if parms["MBmaxFBW"]==None: parms["MBmaxFBW"] = 0.05
-            if parms["MBnorder"]==None: parms["MBnorder"] = 1
-        else:                                             # Narrow-band
-            parms["doMB"] = False
-#            if parms["MBnorder"]==None: parms["MBnorder"] = 1
-#            if parms["MBmaxFBW"]==None: parms["MBmaxFBW"] = float((bandwidth/(4.0*refFreq)))
-
-    FWHMPB= 1.22*((3e8/refFreq)/(antSize))*(180.0/math.pi) #Full-Width at Half-Maximum of the primary beam
-    FWHMRB= 1.22*((3e8/refFreq)/(blSize))*(180.0/math.pi) #Restoring beam (assuming longest baseline)
-    if parms["FOV"]==None:
-        parms["FOV"]=float(FWHMPB*1.5)
-    if parms["xCells"]==None:
-        parms["xCells"]=float(FWHMRB*3600.0/10.0)   # ~10 Pixels per beam should be enough.
-    if parms["yCells"]==None:
-        parms["yCells"]=float(FWHMRB*3600.0/10.0)   # ~10 Pixels per beam
-
-# end KATInitContFqParms
-
-def MKATInitContFQParms(katdata,parms):
     """
     Initialize KAT continuum pipeline frequency dependent parameters
 
@@ -980,9 +848,6 @@ def MKATInitContFQParms(katdata,parms):
         parms["delayBChan"] =  1              # first channel to use in delay solutions
     if parms["delayEChan"] == None:
         parms["delayEChan"] =  0  # highest channel to use in delay solutions
-
-    #parms["bpBChan1"] = 100
-    #parms["bpEChan1"] = 1500
 
     # BPCal channels
     if parms["bpBChan2"] == None:
@@ -1031,53 +896,9 @@ def MKATInitContFQParms(katdata,parms):
             if parms["MBnorder"]==None: parms["MBnorder"] = 1
         else:                                             # Narrow-band
             parms["doMB"] = False
-#            if parms["MBnorder"]==None: parms["MBnorder"] = 1
-#            if parms["MBmaxFBW"]==None: parms["MBmaxFBW"] = float((bandwidth/(4.0*refFreq)))
-
-    FWHMPB= 1.22*((3e8/refFreq)/(antSize))*(180.0/math.pi) #Full-Width at Half-Maximum of the primary beam
-    FWHMRB= 1.22*((3e8/refFreq)/(blSize))*(180.0/math.pi) #Restoring beam (assuming longest baseline)
-    if parms["FOV"]==None:
-        parms["FOV"]=float(FWHMPB*1.5)
-    if parms["xCells"]==None:
-        parms["xCells"]=float(FWHMRB*3600.0/10.0)   # ~10 Pixels per beam should be enough.
-    if parms["yCells"]==None:
-        parms["yCells"]=float(FWHMRB*3600.0/10.0)   # ~10 Pixels per beam
 
     return parms
 # end KATInitContFqParms
-
-
-def MKATGetContChan(editList,BChDrop,EChDrop,nChan):
-
-    """
-    Check through the list of static flags and get the minimun and maximum channels for the bandpass.
-    
-    parms,  the editList Dict containing static flags
-    BChDrop,EChDrop: int
-        number of channels to drop from beginning and end of the spectrum
-    nChan: int 
-        number of channels
-
-    returns: the modified input parameter list (only BChanDrop and EChanDrop are changed)
-    """
-
-    #Make an initial list
-    useBand=np.ones(nChan)
-
-    useband[BChDrop:-EChDrop]=0.0
-
-    #Go through editlist and fill channel flags
-    for thisEdit in editList:
-        if thisEdit["Ant"] == [0,0]:
-            startChan=max(0,thisEdit["Chans"][0]-1)  # AIPS to python convention
-            endChan=min(thisEdit["Chans"][1],nChan-1)
-            useBand[startChan:endChan]=0.0
-    
-    #Find min channel
-    BChDrop = int(np.min(np.where(useBand==1.0)))
-    EChDrop = int(nChan-np.max(np.where(useBand==1.0)))
-
-    return BChDrop,EChDrop
 
 
 def EVLAClearCal(uv, err, doGain=True, doBP=False, doFlag=False,
@@ -1222,209 +1043,6 @@ def EVLACopyTable(inObj, outObj, inTab, err, inVer=1, outVer=0,
     return 0
     # end EVLACopyTable
 
-def EVLAUVLoad(filename, inDisk, Aname, Aclass, Adisk, Aseq, err, logfile=''):
-    """
-    Read FITS uvtab file into AIPS
-
-    Returns task error code, 0=OK, else failed
-    Read a UVTAB FITS UV data file and write an AIPS data set
-
-    * filename   = name of FITS file
-    * inDisk     = FITS directory number
-    * Aname      = AIPS name of file
-    * Aclass     = AIPS class of file
-    * Aseq       = AIPS sequence number of file, 0=> create new
-    * Adisk      = FITS directory number
-    * err        = Python Obit Error/message stack
-    * logfile    = logfile for messages
-
-    returns AIPS UV data object
-    """
-    ################################################################
-    mess =  "Load FITS uvtab file into AIPS"
-    printMess(mess, logfile)
-    #
-    # Checks
-    if not OErr.OErrIsA(err):
-        raise TypeError,"err MUST be an OErr"
-    #
-    # Get input
-    inUV = UV.newPFUV("FITS UV DATA", filename, inDisk, True, err)
-    if err.isErr:
-        OErr.printErrMsg(err, "Error with FITS data")
-    # Get output, create new if seq=0
-    if Aseq<1:
-        OErr.printErr(err)   # Print any outstanding messages
-        user = OSystem.PGetAIPSuser()
-        Aseq=AIPSDir.PHiSeq(Adisk,user,Aname,Aclass,"MA",err)
-        # If it already exists, increment seq
-        if AIPSDir.PTestCNO(Adisk,user,Aname,Aclass,"MA",Aseq,err)>0:
-            Aseq = Aseq+1
-        OErr.PClear(err)     # Clear any message/error
-    mess = "Creating AIPS UV file "+Aname+"."+Aclass+"."+str(Aseq)+" on disk "+str(Adisk)
-    printMess(mess, logfile)
-    outUV = UV.newPAUV("AIPS UV DATA", Aname, Aclass, Adisk, Aseq, False, err)
-    if err.isErr:
-        OErr.printErrMsg(err, "Error creating AIPS data")
-    # Copy
-    UV.PCopy (inUV, outUV, err)
-    if err.isErr:
-        OErr.printErrMsg(err, "Error copying UV data to AIPS")
-    # Copy History
-    inHistory  = History.History("inhistory",  inUV.List, err)
-    outHistory = History.History("outhistory", outUV.List, err)
-    History.PCopyHeader(inHistory, outHistory, err)
-    # Add history
-    outHistory.Open(History.READWRITE, err)
-    outHistory.TimeStamp(" Start Obit uvlod",err)
-    outHistory.WriteRec(-1,"uvlod   / FITS file "+filename+" disk "+str(inDisk),err)
-    outHistory.Close(err)
-    #
-    # Copy Tables
-    exclude=["AIPS HI", "AIPS AN", "AIPS FQ", "AIPS SL", "AIPS PL", "History"]
-    include=[]
-    UV.PCopyTables (inUV, outUV, exclude, include, err)
-    del inUV
-    return outUV  # return new object
-    # end EVLAUVLoad
-
-def EVLAUVLoadT(filename, disk, Aname, Aclass, Adisk, Aseq, err, logfile="  ", \
-                    check=False, debug = False,  Compress=False):
-    """
-    Read FITS file into AIPS
-
-    Read input uvtab FITS file, write AIPS
-    Returns Obit uv object, None on failure
-
-    * Filename = input FITS uvtab format file
-    * disk     = input FITS file disk number
-    * Aname    = output AIPS file name
-    * Aclass   = output AIPS file class
-    * Adisk    = output AIPS file disk
-    * Aseq     = output AIPS file sequence
-    * err      = Obit error/message stack
-    * check    = Only check script, don't execute tasks
-    * debug    = Run tasks debug, show input
-    * Compress = Write AIPS data in compressed form?
-    """
-    ################################################################
-    mess =  "Load FITS uvtab file into AIPS"
-    printMess(mess, logfile)
-    #
-    uvc = ObitTask.ObitTask("UVCopy")
-    try:
-        uvc.userno   = OSystem.PGetAIPSuser()   # This sometimes gets lost
-    except Exception, exception:
-        pass
-    uvc.DataType = "FITS"
-    uvc.inFile   = filename
-    uvc.inDisk   = disk
-    uvc.outDType = "AIPS"
-    uvc.outName  = Aname
-    uvc.outClass = Aclass
-    uvc.outSeq   = Aseq
-    uvc.outDisk  = Adisk
-    uvc.Compress = Compress
-    uvc.taskLog  = logfile
-    if debug:
-        uvc.i
-        uvc.debug = debug
-    # Trap failure
-    try:
-        if not check:
-            uvc.g
-    except Exception, exception:
-        print exception
-        mess = "UVData load Failed "
-        printMess(mess, logfile)
-    else:
-        pass
-
-    # Get output
-    if uvc.retCode==0:
-        outUV = UV.newPAUV("UVdata", Aname, Aclass, Adisk, Aseq, True, err)
-    else:
-        outUV = None
-    return outUV
-    # end EVLAUVLoadT
-
-def EVLAUVLoadArch(dataroot, Aname, Aclass, Adisk, Aseq, err, \
-                   selConfig=-1, selBand="", selChan=0, selNIF=0, \
-                   dropZero=True, calInt=0.5,  doSwPwr=False, Compress=False, \
-                   logfile = "", check=False, debug = False):
-    """
-    Read EVLA archive into AIPS
-
-    Read EVLA archive file, write AIPS
-    Returns Obit uv object, None on failure
-
-    * dataroot = root of archive directory structure
-    * Aname    = output AIPS file name
-    * Aclass   = output AIPS file class
-    * Adisk    = output AIPS file disk
-    * Aseq     = output AIPS file sequence
-    * err      = Obit error/message stack
-    * selBand  = Selected band, def first
-    * selChan  = Selected number of channels, def first
-    * selNIF   = Selected number of IFs, def first
-    * dropZero = If true drop records with all zeroes
-    * calInt   = CL table interval
-    * doSwPwr  = Make EVLA Switched power corr?
-    * Compress = Write AIPS data in compressed form?
-    * check    = Only check script, don't execute tasks
-    * debug    = Run tasks debug, show input
-    """
-    ################################################################
-    mess =  "Load archive file into AIPS"
-    printMess(mess, logfile)
-    #
-    outuv        = None
-    bdf = ObitTask.ObitTask("BDFIn")
-    try:
-        bdf.userno   = OSystem.PGetAIPSuser()   # This sometimes gets lost
-    except Exception, exception:
-        pass
-    bdf.DataRoot = dataroot
-    bdf.DataType = "AIPS"
-    bdf.outName  = Aname[0:12]
-    bdf.outClass = Aclass[0:6]
-    bdf.outSeq   = Aseq
-    bdf.outDisk  = Adisk
-    bdf.selConfig= selConfig
-    bdf.selBand  = selBand
-    bdf.selChan  = selChan
-    bdf.selIF    = selNIF
-    bdf.dropZero = dropZero
-    bdf.calInt   = calInt
-    bdf.doSwPwr  = doSwPwr
-    bdf.Compress = Compress
-    bdf.taskLog  = logfile
-    if debug:
-        bdf.i
-        bdf.debug = debug
-    # Trap failure
-    try:
-        if not check:
-            bdf.g
-    except Exception, exception:
-        print exception
-        mess = "UVData load Failed "
-        printMess(mess, logfile)
-    else:
-        pass
-
-    # Get output
-    if bdf.retCode==0:
-        outUV = UV.newPAUV("UVdata", Aname, Aclass, Adisk, Aseq, True, err)
-    else:
-        outUV = None
-
-    # Dummy entry to ensure FG table 1
-    if not check:
-        UV.PFlag (outuv, err, timeRange=[1.0e20,1.0e21], Ants=[999,0], Reason="Dummy flag")
-
-    return outUV
-    # end EVLAUVLoadArch
 
 def KATHann(inUV, Aname, Aclass, Adisk, Aseq, err, doDescm=True, \
              flagVer=-1, logfile='', zapin=True, check=False, debug=False):
@@ -1487,6 +1105,7 @@ def KATHann(inUV, Aname, Aclass, Adisk, Aseq, err, doDescm=True, \
         inUV.Zap(err)
     return outUV
     # end EVLAHann
+
 
 def EVLAImFITS(inImage, filename, outDisk, err, fract=None, quant=None, \
           exclude=["AIPS HI","AIPS PL","AIPS SL"], include=["AIPS CC"],
@@ -1834,6 +1453,7 @@ def KATSplatandUVFITS(inUV, filename, outDisk, err, logfile=""):
     KATUVFITS(tempUV,filename, outDisk, err, logfile=logfile)
     tempUV.Zap(err)
     return
+
 
 def EVLAUVFITSTab(inUV, filename, outDisk, err, \
               exclude=["AIPS HI", "AIPS AN", "AIPS FQ", "AIPS SL", "AIPS PL"], \
@@ -2630,6 +2250,7 @@ def KATGetCalModel(uv, parms, fileroot, err, logFile='', sefd=1000., check=False
 def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
                      timeRange=[0.,0.], FreqID=1, doCalib=-1, gainUse=0, minSNR=5.0, \
                      refAnts=[0], doBand=-1, BPVer=0, flagVer=-1, doTwo=True, doZeroPhs=False, \
+                     doAvgIF=False, doAvgPol=False, \
                      doPlot=False, plotFile="./DelayCal.ps", \
                      nThreads=1, noScrat=[], logfile='', check=False, debug=False):
     """
@@ -2658,6 +2279,8 @@ def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
     * flagVer    = Input Flagging table version
     * doTwo      = If True, use one and two baseline combinations
       for delay calibration, else only one baseline
+    * doAvgIF    = Average the IF during delay calibration
+    * doAvgPol   = Average the polarizations
     * doPlot     = If True make plots of SN gains
     * plotFile   = Name of postscript file for plots
     * nThreads   = Max. number of threads to use
@@ -2701,7 +2324,8 @@ def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
     calib.noScrat   = noScrat
     calib.nThreads  = nThreads
     calib.doTwo     = True
-    
+    calib.avgIF     = doAvgIF
+    calib.avgPol    = doAvgPol
     # Loop over calibrators
     for DlyCal in DlyCals:
         calib.Sources[0]= DlyCal["Source"]
@@ -2722,7 +2346,6 @@ def EVLADelayCal(uv,DlyCals,  err, solInt=0.5, smoTime=10.0, BChan=1, EChan=0, \
         calib.modelFlux = DlyCal["CalModelFlux"]
         calib.modelPos  = DlyCal["CalModelPos"]
         calib.modelParm = DlyCal["CalModelParm"]
-        
         if debug:
             calib.prtLv =6
             calib.i
@@ -3358,6 +2981,75 @@ def KATCalAP(uv, target, ACals, err, \
     return 0
     # end EVLACal
 
+
+def KATXPhase(inDELA, inUV, err, timeRange=[0.,0.], ChWid=0, doCalib=-1,
+                gainUse=0, doBand=0, BPVer=0, flagVer=-1, BPSoln=0, CHWid=0,
+                refAnt=0, solInt=0.0, logfile="", noScrat=[], check=False, debug=False):
+    """ Perform Cross Phase calibration using auto-corrs on a delay calibrator scan and
+        attach BP table to UV data
+
+    Returns task error code, 0=OK, else failed
+    inUV       = UV data to have BP table attached
+    inDELA     = DELAY calibration UV data (Assumed just one required scan)
+    err        = Obit error/message stack
+    doCalib  = Apply calibration table, positive=>calibrate
+    gainUse  = CL/SN table to apply
+    doBand   = If >0.5 apply previous bandpass cal.
+    ChWid    = use CWid channels in BP calibration
+    Antennas = Antennas to use
+    BPVer    = previous Bandpass table (BP) version
+    flagVer  = Input Flagging table version
+    timerange= timerange in days to use
+    BPSoln    = output version of BP table
+    refAnt   = Reference antenna number
+    solInt   = Solution interval (min) BP table entries.
+    taskLog  =Log file to write messages to INSTEAD of the terminal
+    noScrat  =A list of AIPS disk numbers on which you do not 
+             wish scratch files
+    """
+    ################################################################
+
+    xphase = ObitTask.ObitTask("MKXPhase")
+    try:
+        xphase.userno  = OSystem.PGetAIPSuser()   # This sometimes gets lost
+    except Exception, exception:
+        pass
+    OK = False   # Must have some work
+    xphase.taskLog = logfile
+    if not check:
+        setname(inDELA, xphase)
+        setoname(inUV, xphase)
+
+    xphase.doBand    = doBand
+    xphase.BPVer     = BPVer
+    xphase.doCalib   = doCalib
+    xphase.gainUse   = gainUse
+    xphase.flagVer   = flagVer
+    xphase.solInt    = solInt
+    xphase.refAnt    = 0
+    xphase.timeRange = timeRange
+    xphase.ChWid     = ChWid
+    xphase.BPSoln    = BPSoln
+    xphase.taskLog   = logfile
+    xphase.noScrat   = noScrat
+
+    if debug:
+            xphase.i
+    xphase.debug = False
+    # Trap failure
+    try:
+        if not check:
+            xphase.g
+    except Exception, exception:
+        print exception
+        mess = "MKXPhase Failed retCode="+str(xphase.retCode)
+        printMess(mess, logfile)
+        return 1
+    else:
+        OK = True
+
+    return 0
+
 def KATBPCal(uv, BPCals, err, newBPVer=1, timerange=[0.,0.], UVRange=[0.,0.], \
               doCalib=2, gainUse=0, doBand=0, BPVer=0, flagVer=-1,  \
               doCenter1=None, BChan1=1, EChan1=0, \
@@ -3391,6 +3083,7 @@ def KATBPCal(uv, BPCals, err, newBPVer=1, timerange=[0.,0.], UVRange=[0.,0.], \
     * BPCals   = list of bandpass calibrators/models
     * err      = Obit error/message stack
     * newBPVer = output BP table
+    * mergeBPVer= If >=0 (0= new highest Ver) then merge newBPVer and BPVer into mergeBPVer
     * doCalib  = Apply calibration table, positive=>calibrate
     * gainUse  = CL/SN table to apply
     * doBand   = If >0.5 apply previous bandpass cal.
@@ -3423,6 +3116,7 @@ def KATBPCal(uv, BPCals, err, newBPVer=1, timerange=[0.,0.], UVRange=[0.,0.], \
     ################################################################
     mess =  "Bandpass calibrate data"
     printMess(mess, logfile)
+    BPVer = uv.GetHighVer('AIPS BP') if BPVer == 0 else BPVer
     bpass = ObitTask.ObitTask("BPass")
     try:
         bpass.userno  = OSystem.PGetAIPSuser()   # This sometimes gets lost
@@ -3472,7 +3166,12 @@ def KATBPCal(uv, BPCals, err, newBPVer=1, timerange=[0.,0.], UVRange=[0.,0.], \
         bpass.EChan2 = nchan
 
     # Loop over calibrators
-    outBPVer=newBPVer
+    uv.Open(UV.READONLY, err)
+    uv.Close(err)
+    hiBPVer = uv.GetHighVer('AIPS BP')
+    if newBPVer <= 0:
+        newBPVer = hiBPVer + 1
+    outBPVer = newBPVer
     for BPCal in BPCals:
         thisOK = False
         bpass.Sources[0] = BPCal["Source"]
@@ -3529,6 +3228,39 @@ def KATBPCal(uv, BPCals, err, newBPVer=1, timerange=[0.,0.], UVRange=[0.,0.], \
     origBP=UV.PGetTable(uv,UV.READWRITE,"AIPS BP",newBPVer,err)
     Table.PSort(origBP, "TIME", False, err)
     OErr.printErrMsg(err, "Error merging AIPS BP tables")
+
+    # Merge input BP and output BP into mergeBPVer?
+    if doBand>0.5:
+        uv.Open(UV.READONLY, err)
+        uv.Close(err)
+        mergeBPVer = uv.GetHighVer('AIPS BP') + 1
+        mess =  "Merge BP %d and BP %d to BP %d" %(BPVer, newBPVer, mergeBPVer)
+        printMess(mess, logfile)
+        bpcal = ObitTask.ObitTask('BPCal')
+        try:
+            bpcal.userno  = OSystem.PGetAIPSuser()   # This sometimes gets lost
+        except Exception, exception:
+            pass
+        bpcal.taskLog = logfile
+        if not check:
+            setname(uv,bpcal)
+        bpcal.BPVer1 = BPVer
+        bpcal.BPVer2 = newBPVer
+        bpcal.BPOut  = mergeBPVer
+        bpcal.doBand = doBand
+        bpcal.refAnt = refAnt
+        if debug:
+            bpcal.i
+        bpcal.debug = False
+        # Trap failure
+        try:
+            if not check:
+                bpcal.g
+        except Exception, exception:
+            print exception
+            mess = "BPCal Failed retCode="+str(bpass.retCode)
+            printMess(mess, logfile)
+            return 1
 
     # Plot corrected data?
     if doPlot:
