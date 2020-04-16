@@ -33,16 +33,15 @@ AIPS_VERSION = os.environ['AIPS_VERSION']
 user = OSystem.PGetAIPSuser()
 AIPS.userno = user
 disk = 1
-fitsdisk = 0
+fitsdisk = 1
 nam = filebase
 cls = "Raw"
 seq = 1
 logFile       = "Image.log"   # Processing log file
 
-mastertemplate=ObitTalkUtil.FITSDir.FITSdisks[fitsdisk]+'MKATTemplate.uvtab.gz'
-outtemplate=nam+'.uvtemp'
-KATH5toAIPS.MakeTemplate(mastertemplate,outtemplate,10)
-uv=OTObit.uvlod(outtemplate,0,'TEMP',cls,disk,seq,err)
+#astertemplate=ObitTalkUtil.FITSDir.FITSdisks[fitsdisk]+'MKATTemplate.uvtab.gz'
+#outtemplate=nam+'.uvtemp'
+#uv=OTObit.uvlod(mastertemplate,0,'TEMP',cls,disk,seq,err)
 #uv2=OTObit.uvlod(args[0],0,nam,cls,disk,seq,err)
 # Add output directory to the environment so AIPS can see it
 fn=args[0]
@@ -53,7 +52,7 @@ else:
     os.environ['FTD']=pth
 
 #fitld=AIPSTask.AIPSTask("uvlod")
-print OSystem.PGetAIPSuser()
+print(OSystem.PGetAIPSuser())
 #try:
 #    fitld.userno = OSystem.PGetAIPSuser()   # This sometimes gets lost
 #except Exception, exception:
@@ -79,7 +78,7 @@ if options.blavg:
     blavg=ObitTask.ObitTask('UVBlAvg')
     try:
         blavg.userno = OSystem.PGetAIPSuser()   # This sometimes gets lost
-    except Exception, exception:
+    except Exception as exception:
         pass
     setname(uv,blavg)
     blavg.Sources = targets.split(',')

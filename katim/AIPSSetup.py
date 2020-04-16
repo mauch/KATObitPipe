@@ -1,8 +1,8 @@
 # Define AIPS and FITS disks
 
 import os,shutil
-import AIPSLite
-import ConfigParser
+from . import AIPSLite
+import configparser
 import OErr, OSystem, AIPS, ObitTalkUtil
 
 # Setup FITS, AIPS_VERSION and AIPS_DISK from a configuration file if it exists,
@@ -30,10 +30,10 @@ def AIPSSetup(err,configfile=None,scratchdir=None,overwrite=True,aipsdisk='aipsd
         aips_version = os.environ['AIPS_VERSION'][-7:]
     except:
         aips_dir = './'
-        aips_version = '31DEC18'    # Should sort out where to change this if necessary!!
+        aips_version = '31DEC19'    # Should sort out where to change this if necessary!!
 
     configdefaults   = {'aips_dir': aips_dir, 'obit_dir': OBIT_EXEC, 'aips_version': aips_version, 'scratch_area': cwd, 'metadata_dir': OBIT_DATA}
-    config = ConfigParser.ConfigParser(configdefaults)
+    config = configparser.ConfigParser(configdefaults)
     config.add_section('KATPIPE')
 
     if configfile:

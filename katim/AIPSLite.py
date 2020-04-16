@@ -32,7 +32,7 @@ def arch():
     elif uname[0] == 'Darwin':
         return 'MACINT'
     else:
-        raise NotImplementedError, 'Unknown Architecture'
+        raise NotImplementedError('Unknown Architecture')
 
 def init_environ(path=None, version=default_version):
     """Set required environment variables"""
@@ -51,7 +51,7 @@ def init_environ(path=None, version=default_version):
     elif os.environ['ARCH'] == 'MACINT':
         lib_env = 'DYLD_LIBRARY_PATH'
     lib_dir = '%s/%s/LIBR/INTELCMP' % (os.environ['AIPS_VERSION'], os.environ['ARCH'])
-    if os.environ.has_key(lib_env):
+    if lib_env in os.environ:
         os.environ[lib_env] += ':' + lib_dir
     else:
         os.environ[lib_env] = lib_dir
@@ -87,7 +87,7 @@ def rsync(server, path_list, force=False):
     args.append(os.environ['AIPS_VERSION'])    # Download destination
     if os.spawnvp(os.P_WAIT, 'rsync', args) != 0:
         # TODO: Better failure reporting
-        print >> sys.stderr, 'rsync failure'
+        print('rsync failure', file=sys.stderr)
         sys.exit(-1)
 
 def make_da00(da00_path=None, force=False):
@@ -116,12 +116,12 @@ def make_disk(disk_path=None):
 
 def ehex(num, width=0, pad_char='0'):
     """Convert a number to base 36."""
-    chars = string.digits + string.uppercase
+    chars = string.digits + string.ascii_uppercase
     base = len(chars)
     hex_str = ''
     while num > 0:
         hex_str = chars[num % base] + hex_str
-        num /= base
+        num //= base
     pad_len = width - len(hex_str)
     if pad_len > 0:
         hex_str = str(pad_char) * pad_len + hex_str

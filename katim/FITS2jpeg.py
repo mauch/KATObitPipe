@@ -243,7 +243,7 @@ def fits2jpeg(fitsfilename,contrast=99.9,cmap='jet',chans=None,imchans=False,for
 
     #Only work if the image exists
     if not os.path.exists(fitsfilename):
-        print 'Specified fits file does not exist'
+        print('Specified fits file does not exist')
         sys.exit(-1)
     outname = os.path.splitext(fitsfilename)[0]
     #open file in pyfits. ANd get the image plane(s) and the header

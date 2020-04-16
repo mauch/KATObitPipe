@@ -7,7 +7,7 @@
 
 from AIPSTask import *
 from AIPSTask import AIPSTask as obAIPSTask
-import AIPSLite
+from . import AIPSLite
 import os
 
 class AIPSTask(obAIPSTask):
