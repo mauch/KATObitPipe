@@ -10,7 +10,7 @@ from katim import KATH5toAIPS
 from katim import KATCal
 # Option parser
 from optparse import OptionParser
-import pyfits
+from astropy.io import fits as pyfits
 
 import warnings
 warnings.simplefilter('ignore')
@@ -52,7 +52,7 @@ if options.channel_range:
         raise RuntimeError("Requested channel range outside data set boundaries. Set channels in the range [0,%s]" % (katdata.shape[1]-1,))
 
     chan_range = slice(first_chan, last_chan + 1)
-    print "\nChannel range %s through %s." % (first_chan, last_chan)
+    print("\nChannel range %s through %s." % (first_chan, last_chan))
     katdata.select(channels=chan_range)
 
 katdata.select(scans='track')

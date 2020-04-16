@@ -35,10 +35,10 @@ try:
     from katdal.lazy_indexer import DaskLazyIndexer
     from katdal.chunkstore import StoreUnavailable
     import katpoint
-except Exception, exception:
-    print exception
-    print "KAT software not available"
-    raise  RuntimeError, "KAT software unavailable"
+except Exception as exception:
+    print(exception)
+    print("KAT software not available")
+    raise  RuntimeError("KAT software unavailable")
 else:
     pass
 from collections import namedtuple
@@ -84,9 +84,9 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
         Fring stop data? (Values only for KAT-7)
     """
     ################################################################
-    OErr.PLog(err, OErr.Info, "Converting h5 data to AIPS UV format.")
+    OErr.PLog(err, OErr.Info, "Converting MVF data to AIPS UV format.")
     OErr.printErr(err)
-    print "Converting MVF data to AIPS UV format.\n"
+    print("Converting MVF data to AIPS UV format.\n")
 
     # Extract metadata
     meta = GetKATMeta(katdata, err)
@@ -128,7 +128,7 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     # initial CL table
     OErr.PLog(err, OErr.Info, "Create Initial CL table")
     OErr.printErr(err)
-    print "Create Initial CL table\n"
+    print("Create Initial CL table\n")
     UV.PTableCLfromNX(outUV, meta["maxant"], err, calInt=calInt)
     outUV.Open(UV.READONLY,err)
     outUV.Close(err)
@@ -139,7 +139,7 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     outHistory = History.History("outhistory", outUV.List, err)
     outHistory.Open(History.READWRITE, err)
     outHistory.TimeStamp("Convert MeerKAT MVF data to Obit", err)
-    outHistory.WriteRec(-1,"datafile = "+katdata.name.encode(), err)
+    outHistory.WriteRec(-1,"datafile = "+katdata.name, err)
     outHistory.WriteRec(-1,"calInt   = "+str(calInt), err)
     outHistory.Close(err)
     outUV.Open(UV.READONLY,err)
@@ -260,7 +260,7 @@ def GetKATMeta(katdata, err):
         #Fill the matrix with the inverse baselines
         dl[a2, a1, dp] = idx
     out["baselines"] = numpy.array([(b[0],b[1]) for b in itertools.combinations_with_replacement(antnums,2)])
-    out["blineind"] = numpy.array([(b[0],b[1]) for b in itertools.combinations_with_replacement(range(out["nants"]),2)])
+    out["blineind"] = numpy.array([(b[0],b[1]) for b in itertools.combinations_with_replacement(list(range(out["nants"])),2)])
     out["products"] = dl
     out["nstokes"]  = nstokes
     # integration time
@@ -596,7 +596,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
         msg = "W term in UVW coordinates will be used to stop the fringes."
         OErr.PLog(err, OErr.Info, msg)
         OErr.printErr(err)
-        print msg
+        print(msg)
 
     # Set up baseline vectors of uvw calculation
     array_centre = katpoint.Antenna('', *newants[0].ref_position_wgs84)
@@ -626,7 +626,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
                                                  day2dhms((katdata.timestamps[0] - time0) / 86400.0)[0:12])
         OErr.PLog(err, OErr.Info, msg);
         OErr.printErr(err)
-        print msg
+        print(msg)
         for sl in scan_slices:
             tm = katdata.timestamps[sl]
             nint = tm.shape[0]
@@ -702,8 +702,8 @@ def MakeTemplate(inuv, outuv, katdata):
     newvis = pyfits.Column(name='VISIBILITIES',format='%dE'%(3*4*numchans),dim='(3,4,%d,1,1,1)'%(numchans,),array=numpy.zeros((nvispio,1,1,1,numchans,4,3,),dtype=numpy.float32))
     vistable.add_col(newvis)
     vishdu = pyfits.BinTableHDU.from_columns(vistable)
-    for key in uvfits[1].header.keys():
-        if (key not in vishdu.header.keys()) and (key != 'HISTORY'):
+    for key in list(uvfits[1].header.keys()):
+        if (key not in list(vishdu.header.keys())) and (key != 'HISTORY'):
             vishdu.header[key]=uvfits[1].header[key]
 
     newuvfits = pyfits.HDUList([uvfits[0],vishdu,uvfits[2],uvfits[3],uvfits[4],uvfits[5],uvfits[6]])
@@ -795,13 +795,13 @@ def load(dataset, indices, vis, weights, flags, err):
                 msg = 'Timeout when reading dumps %d to %d. Try %d/%d....' % (out_ts.start + 1, out_ts.stop, i + 1, NUM_RETRIES)
                 OErr.PLog(err, OErr.Warn, msg);
                 OErr.printErr(err)
-                print msg
+                print(msg)
         # Flag the data and warn if we can't get it
         if i == NUM_RETRIES - 1:
             msg = 'Too many timeouts, flagging dumps %d to %d' % (out_ts.start + 1, out_ts.stop)
             OErr.PLog(err, OErr.Warn, msg);
             OErr.printErr(err)
-            print msg
+            print(msg)
             flags[out_ts] = True
 
 @numba.jit(nopython=True, parallel=True)
