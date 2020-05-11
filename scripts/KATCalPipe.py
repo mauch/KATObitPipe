@@ -22,8 +22,8 @@ parser.add_option("--dropants", help='List of antennas to remove from pbservatio
 parser.add_option("--blmask", type='float', default=1.e10, help='Baseline length cutoff for the static mask (default apply to all baselines)')
 parser.add_option("--refant", type='str', default=None, help='Reference antenna to use for calibration')
 parser.add_option("--katdal_refant", type='str', default='', help='Reference antenna to use for activity in katdal')
-parser.add_option("--polcal", default=False, action='store_true', help='Switch on polarisation calibration'
-									'Fix the X & Y gains. This will cause the selected target (via --XTYarg) alone'
+parser.add_option("--polcal", default=False, action='store_true', help='Switch on polarisation calibration. '
+									'Fix the X & Y gains. This will cause the selected target (via --XTYarg) alone '
  									'to be used for delay and bandpass then subsequent gains to be computed with avgPol=True')
 parser.add_option("--XYtarg", default=None, help='Name of target to use to fix the X & Y gains (default is 1934-638 or 0408-65)')
 
