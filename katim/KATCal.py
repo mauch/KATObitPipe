@@ -600,9 +600,16 @@ def KATGetDelayCal(katdata, h5file):
         dc_katdata = katdal.open(h5file, capture_block_id=cbid)
         # Get the scan we want from the delaycal observation.
         # A delaycal has two tracks and the second one should have CompScanLabel='corrected'
-        dc_katdata.select(scans='track', compscans='corrected')
-        # Now there should only be the scans we want
-        if len(dc_katdata.scan_indices) > 0:
+        dc_katdata.select(scans='track,stop', compscans='corrected')
+        # Now there should only be the scans we want, find the longest one
+        scan_select = -1
+        max_scan = 0
+        for scan, _, _ in dc_katdata.scans():
+            scan_length = len(dc_katdata.dumps)
+            if scan_length > max_scan:
+                max_scan, scan_select = scan_length, scan
+        if scan_select >= 0:
+            dc_katdata.select(scans=scan_select)
             return dc_katdata
     raise ValueError('Could not find a valid delay calibration for this schedule block.'
                      ' Cannot do polcal.')
