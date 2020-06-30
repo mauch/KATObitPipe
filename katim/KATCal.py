@@ -568,7 +568,7 @@ def KATh5Select(katdata, parms, err, **kwargs):
     # Do selection on delay_katdata if we need to
     if parms["PolCal"]:
         kwargs['delay_katdata'].select(ants=file_ants, channels=chan_range, 
-                                       flags='cam,data_lost,ingest_rfi,predicted_rfi', reset='')
+                                       flags='data_lost,ingest_rfi,predicted_rfi', reset='')
 
     #Other errors
     if err.isErr:
