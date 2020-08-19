@@ -66,9 +66,10 @@ def MKContPipeline(files, outputdir, **kwargs):
     err = OErr.OErr()
 
     #################### Initialize filenames #######################################################
-    fileRoot      = os.path.join(outputdir,
-                                 katdata.obs_params.get('capture_block_id', 
-                                                        katdata.experiment_id)) # root of file name
+    nameRoot      = katdata.obs_params.get('capture_block_id', katdata.experiment_id)
+    if type(nameRoot) == list:
+        nameRoot  = nameRoot[0]
+    fileRoot      = os.path.join(outputdir, nameRoot) # root of file name
     logFile       = fileRoot + ".log"   # Processing log file
     avgClass      = ("UVAv")[0:6]  # Averaged data AIPS class
     manifestfile  = outputdir + '/manifest.pickle'
@@ -92,7 +93,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     AIPS.userno = user
     disk = 1
     fitsdisk = 1
-    nam = katdata.obs_params.get('capture_block_id', katdata.experiment_id)[:10]
+    nam = nameRoot[:10]
     clss = "Raw"
     seq = 1
 
