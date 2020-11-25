@@ -139,7 +139,8 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     outHistory = History.History("outhistory", outUV.List, err)
     outHistory.Open(History.READWRITE, err)
     outHistory.TimeStamp("Convert MeerKAT MVF data to Obit", err)
-    outHistory.WriteRec(-1,"datafile = "+katdata.name, err)
+    for name in katdata.name.split(','):
+        outHistory.WriteRec(-1,"datafile = "+name, err)
     outHistory.WriteRec(-1,"calInt   = "+str(calInt), err)
     outHistory.Close(err)
     outUV.Open(UV.READONLY,err)
