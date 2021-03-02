@@ -449,12 +449,13 @@ def KATh5Select(katdata, parms, err, **kwargs):
         tm = katdata.timestamps[:]
         nint = len(tm)
         el=target.azel(tm[int(nint/2)])[1]*180./math.pi
-        if el >= 20.0:
+        if el >= parms['minElev']:
             good_elevations.append(scan)
         else:   # Throw away scans at low elevation
-            msg = "Rejecting Scan:%s, Target:%s Elevation %4.1f deg."%(scan,target.name,el)
+            msg = "Rejecting Scan:%s, Target:%s Elevation %4.1f < %4.1f deg."%(scan,target.name,el,parms['minElev'])
             OErr.PLog(err, OErr.Info, msg)
             OErr.printErr(err)
+            print(msg)
     katdata.select(scans=good_elevations, reset='')
 
     # If we are going to do flagging on import- then don't select cal_rfi
