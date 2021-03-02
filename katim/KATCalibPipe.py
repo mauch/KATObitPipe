@@ -98,7 +98,6 @@ def MKContPipeline(files, outputdir, **kwargs):
     seq = 1
 
     ############### Condition data #########################
-
     #Get calibrator models
     fluxcals = katpoint.Catalogue(open(FITSDir.FITSdisks[1]+"/PERLEY_BUTLER_2013.csv"))
     #Condition data (get bpcals, update names for aips conventions etc)

@@ -658,13 +658,17 @@ def KATInitTargParms(katdata,parms,err):
     # Do this here to catch user input targets with spaces in the name.
     parms["targets"] = [targ.replace(' ','_') for targ in parms["targets"]]
 
+    # Get the band of observation
+    sw = katdata.spectral_windows[katdata.spw]
+    band = sw.band
+
     # Now make calibrater model dicts.
     # Bandpass calibrators
     parms["BPCals"]=parms.get("BPCals",[])
     if not parms["BPCals"]:
         for cal in parms["BPCal"]:
             #Try and find a bpcal model in disk 1
-            modelfile = '%sLModel.fits'%(cal[0:12])
+            modelfile = f'{cal[0:12]}{band}Model.fits'
             if os.path.isfile(FITSDir.FITSdisks[1] + modelfile):
                 model=EVLACalModel(cal[0:12],CalDisk=1,CalDataType='FITS',CalFile=modelfile,CalCCVer=1,CalCmode='COMP',CalNfield=1)
             else:
@@ -689,7 +693,7 @@ def KATInitTargParms(katdata,parms,err):
     if not parms["ACals"]:
         for cal in parms["ACal"]:
             #Try and find a model in disk 1
-            modelfile = '%sLModel.fits'%(cal[0:12])
+            modelfile = f'{cal[0:12]}{band}Model.fits'
             if os.path.isfile(FITSDir.FITSdisks[1] + modelfile):
                 model=EVLACalModel(cal[0:12],CalDisk=1,CalDataType='FITS',CalFile=modelfile,CalCCVer=1,CalCmode='COMP',CalNfield=1)
             else:
