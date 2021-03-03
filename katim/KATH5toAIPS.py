@@ -54,7 +54,12 @@ import dask
 import dask.array as da
 import numba
 from katsdpsigproc.rfi.twodflag import SumThresholdFlagger
+from textwrap import TextWrapper
 
+""" TextWrapper for wrapping AIPS history text to 70 chars """
+_history_wrapper = TextWrapper(width=70, initial_indent='',
+                               subsequent_indent='  ',
+                               break_long_words=True)
 
 def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
               calInt=1.0, static=None, **kwargs):
@@ -140,7 +145,8 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     outHistory.Open(History.READWRITE, err)
     outHistory.TimeStamp("Convert MeerKAT MVF data to Obit", err)
     for name in katdata.name.split(','):
-        outHistory.WriteRec(-1,"datafile = "+name, err)
+        for line in _history_wrapper.wrap("datafile = "+name):
+            outHistory.WriteRec(-1, line, err)
     outHistory.WriteRec(-1,"calInt   = "+str(calInt), err)
     outHistory.Close(err)
     outUV.Open(UV.READONLY,err)

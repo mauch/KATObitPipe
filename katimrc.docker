@@ -1,0 +1,13 @@
+#######################################################################
+# Location: This file needs to be ~/.katimrc for it to be used.       #
+# Used in: AIPSSetup()                                                #
+# Access method: ConfigParser.ConfigParser.read()                     #
+# Default values:                                                     #
+#     aips_dir     = os.environ['AIPS_ROOT'] else './'                #
+#     aips_ver     = os.environ['AIPS_VERSION'][-7:] else '31DEC13'   #
+#     scratch_area = './'                                             #
+#     metadata_dir = os.environ['OBIT'] + '/share/data' else './FITS' #
+# Note: default values are used when RHS of assignment is blank       #
+#######################################################################
+[KATPIPE]
+metadata_dir = /Obit/obit-distro-1.1.630/share/obit/data
