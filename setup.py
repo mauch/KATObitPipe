@@ -3,17 +3,17 @@ from setuptools import setup, find_packages
 
 setup (
     name = "katim",
-    version = "trunk",
-    description = "",
+    version = "0.1.0.dev0",
+    description = "Scripts to calibrate MeerKAT data using Obit",
     author = "Tom Mauch",
     author_email = "tmauch@ska.ac.za",
     packages = find_packages(),
     scripts = [
         "scripts/KATContPipe.py",
         "scripts/mvftouvfits.py",
-	"scripts/image_obit.py",
+	    "scripts/image_obit.py",
         "scripts/KATCalPipe.py",
-	"scripts/KATZenPipe.py"
+	    "scripts/KATZenPipe.py"
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -25,8 +25,14 @@ setup (
         "Topic :: Scientific/Engineering :: Astronomy",
     ],
     platforms = [ "OS Independent" ],
-    keywords="kat kat7 ska",
+    keywords="MeerKAT",
     zip_safe = False,
-    # Bitten Test Suite
-    #test_suite = "katfile.test.suite",
+    install_requires=[
+        "astropy",
+        "katsdpsigproc",
+        "katdal",
+        "katpoint",
+        "matplotlib",
+        "numba",
+        "numpy"]
 )
