@@ -50,15 +50,15 @@ ENV PYTHONPATH="${OBIT_ROOT}/share/obittalk/python:${OBIT_ROOT}/share/python:${P
 RUN rm ${OBIT_ROOT}/lib/libgfortran*
 RUN ln -s /usr/lib/x86_64-linux-gnu/libgfortran.so.3 ${OBIT_ROOT}/lib
 
-# Unzip all the models and make them globally readable
-RUN cd ${OBIT_ROOT}/share/obit/data && gunzip *.fits.gz
-RUN chmod -R 777 ${OBIT_ROOT}/share/obit/data
-
 # Install the pipeline
 COPY . /KATObitPipe
 WORKDIR /KATObitPipe
+
 # Copy metadata to Obit share
 RUN cp ./FITS/* ${OBIT_ROOT}/share/obit/data
+RUN cd ${OBIT_ROOT}/share/obit/data && gunzip *.fits.gz
+RUN chmod -R 777 ${OBIT_ROOT}/share/obit/data
+
 
 RUN pip install -r requirements.txt
 RUN pip install .
