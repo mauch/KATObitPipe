@@ -34,7 +34,7 @@ ENV VIRTUAL_ENV="/ve3"
 # Retrieve Obit and set up environment
 ENV OBIT_BASE_PATH="/Obit"
 ENV OBIT_REVISION="630"
-ENV OBIT_TARBALL="obit-distro-1.1.${OBIT_REVISION}.tar.gz"
+ENV OBIT_TARBALL="Obit.AVX-1.1.${OBIT_REVISION}.tar.gz"
 
 RUN mkdir -p $OBIT_BASE_PATH && cd $OBIT_BASE_PATH && \
     curl https://svn.cv.nrao.edu/obit/linux_distro/${OBIT_TARBALL} | tar xzf -
