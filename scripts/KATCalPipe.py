@@ -26,6 +26,10 @@ parser.add_option("--polcal", default=False, action='store_true', help='Switch o
 									'Fix the X & Y gains. This will cause the selected target (via --XTYarg) alone '
  									'to be used for delay and bandpass then subsequent gains to be computed with avgPol=True')
 parser.add_option("--XYtarg", default=None, help='Name of target to use to fix the X & Y gains (default is 1934-638 or 0408-65)')
+parser.add_option("--delaycal_mvf", default=None, type='str', help='Dataset to use for determining the XY phase calibration. This '
+									'will override the automatic detection of the relevant dataset. NOTE: The dataset MUST have '
+									'been observed using calibrate_delays.py just before the start of the observation. '
+									'This option is only used when --polcal is selected.')
 
 (options, katfilenames) = parser.parse_args()
 
@@ -34,7 +38,7 @@ if len(katfilenames) == 0:
     sys.exit()
 
 kwargs = {}
-for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'polcal', 'XYtarg']:
+for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'polcal', 'XYtarg', 'delaycal_mvf']:
 	if getattr(options,k) != None:
 		kwargs[k] =  getattr(options,k)
 try:

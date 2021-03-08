@@ -575,7 +575,7 @@ def KATh5Select(katdata, parms, err, **kwargs):
     if err.isErr:
         OErr.printErrMsg(err, "Error with h5 file")
 
-def KATGetDelayCal(katdata, h5file):
+def KATGetDelayCal(h5file, katdata=None):
     """
     Try and find the delaycal observation associated with this observation
     Raise a ValueError for various reasons if we cant find it.
@@ -583,35 +583,46 @@ def KATGetDelayCal(katdata, h5file):
     noise diode firing.
     Return a properly conditioned katdal object for the delay cal.
     """
-    try:
-        sb_cbids = katdata.source.telstate.get_range('sdp_capture_block_id', st=0)
-    except KeyError:
-        raise ValueError('Cannot find capture blocks associated with this observation.'
-                             ' Have you used the "full" rdb file?')
-    # Lookup CBIDs in current subarray in reverse order and extract delaycal obs.
-    delay_cbids = [cbid[0] for cbid in sb_cbids[::-1]
-                   if 'calibrate_delays.py' in 
-                   katdata.source.telstate.view(cbid[0])['obs_params']['script_name']]
-    if len(delay_cbids) == 0:
-        raise ValueError('No delay calibration in this schedule block. Cannot do polcal.')
-    # Get the scan we want from the delaycal observation.
-    # And lets do some rudimentary checks that this delay cal is good for what we want.
-    OK = False
-    for cbid in delay_cbids:
-        dc_katdata = katdal.open(h5file, capture_block_id=cbid)
+    def _get_noise_diode_scan(kd):
         # Get the scan we want from the delaycal observation.
         # A delaycal has two tracks and the second one should have CompScanLabel='corrected'
-        dc_katdata.select(scans='track,stop', compscans='corrected')
+        kd.select(scans='track,stop', compscans='corrected')
         # Now there should only be the scans we want, find the longest one
         scan_select = -1
         max_scan = 0
-        for scan, _, _ in dc_katdata.scans():
-            scan_length = len(dc_katdata.dumps)
+        for scan, _, _ in kd.scans():
+            scan_length = len(kd.dumps)
             if scan_length > max_scan:
                 max_scan, scan_select = scan_length, scan
         if scan_select >= 0:
-            dc_katdata.select(scans=scan_select)
+            kd.select(scans=scan_select)
+            return kd
+        return None
+
+    if katdata is None:
+        dc_katdata = katdal.open(h5file)
+        dc_datdata = _get_noise_diode_scan(dc_katdata)
+        if dc_katdata is not None:
             return dc_katdata
+    else:
+        try:
+            sb_cbids = katdata.source.telstate.get_range('sdp_capture_block_id', st=0)
+        except KeyError:
+            raise ValueError('Cannot find capture blocks associated with this observation.')
+        # Lookup CBIDs in current subarray in reverse order and extract delaycal obs.
+        delay_cbids = [cbid[0] for cbid in sb_cbids[::-1]
+                       if 'calibrate_delays.py' in 
+                       katdata.source.telstate.view(cbid[0])['obs_params']['script_name']]
+        if len(delay_cbids) == 0:
+            raise ValueError('No delay calibration in this schedule block. Cannot do polcal.')
+        # Get the scan we want from the delaycal observation.
+        # And lets do some rudimentary checks that this delay cal is good for what we want.
+        OK = False
+        for cbid in delay_cbids:
+            dc_katdata = katdal.open(h5file, capture_block_id=cbid)
+            dc_datdata = _get_noise_diode_scan(dc_katdata)
+            if dc_katdata is not None:
+                return dc_katdata
     raise ValueError('Could not find a valid delay calibration for this schedule block.'
                      ' Cannot do polcal.')
 

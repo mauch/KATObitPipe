@@ -13,7 +13,8 @@ setup (
         "scripts/mvftouvfits.py",
 	    "scripts/image_obit.py",
         "scripts/KATCalPipe.py",
-	    "scripts/KATZenPipe.py"
+	    "scripts/KATZenPipe.py",
+        "scripts/get_delaycal.py"
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",

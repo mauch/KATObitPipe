@@ -54,8 +54,13 @@ def MKContPipeline(files, outputdir, **kwargs):
 
     # If we are doing polcal- search for the most recent delaycal observation
     if kwargs.get('polcal'):
-        delay_katdata = KATGetDelayCal(katdata, h5file)
-        kwargs["delay_katdata"] = delay_katdata   
+        if kwargs.get('delaycal_mvf') is None:
+            # Automatically determine delay_cal CBID
+            delay_katdata = KATGetDelayCal(h5file, katdata)  
+        else:
+            # Use the user supplied one
+            delay_katdata = KATGetDelayCal(kwargs.get('delaycal_mvf'))
+        kwargs["delay_katdata"] = delay_katdata
 
     # Die gracefully if we cannot write to the output area...
     if not os.path.exists(outputdir):
