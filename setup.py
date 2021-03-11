@@ -28,6 +28,7 @@ setup (
     platforms = [ "OS Independent" ],
     keywords="MeerKAT",
     zip_safe = False,
+    python_requires=">=3.6",
     install_requires=[
         "astropy",
         "katsdpsigproc",
