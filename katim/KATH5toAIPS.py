@@ -51,6 +51,8 @@ from astropy.io import fits as pyfits
 import multiprocessing
 import concurrent.futures
 import dask
+# Workaround for warnings from dask when using 'dropants' option.
+dask.config.set(**{'array.slicing.split_large_chunks': False})
 import dask.array as da
 import numba
 from katsdpsigproc.rfi.twodflag import SumThresholdFlagger

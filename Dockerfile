@@ -11,10 +11,11 @@ ENV PACKAGES \
     build-essential \
     ca-certificates \
     curl \
-    libgfortran3 \
     gosu \
     libfreetype6 \
-    libxml2 \ 
+    libgfortran3 \
+    libxml2 \
+    pigz \ 
     pkg-config \
     python3-dev \
     rsync \
