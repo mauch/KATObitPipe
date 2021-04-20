@@ -369,8 +369,8 @@ def KATh5Condition(katdata, caldata, err):
         #Get the nearest calibrator in caldata.
         fluxcal,offset=caldata.closest_to(targ)
         # Update the calibrator flux model
-        if offset*3600.0 < 2.0 and 'bpcal' in targ.tags:  
-            # 2.0 arcseconds should be close enough...
+        if offset*3600.0 < 4.0 and 'bpcal' in targ.tags:
+            # 4.0 arcseconds should be close enough...
             targ.flux_model = fluxcal.flux_model
             if targ.name != fluxcal.name:
                 targ.name = fluxcal.name
