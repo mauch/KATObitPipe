@@ -11,6 +11,7 @@ ENV PACKAGES \
     build-essential \
     ca-certificates \
     curl \
+    git \
     gosu \
     libfreetype6 \
     libgfortran3 \

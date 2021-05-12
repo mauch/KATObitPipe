@@ -2,6 +2,7 @@ astropy==4.1
 matplotlib==3.3.4
 numba==0.52.0
 numpy==1.19.5
-katdal==0.17
-katpoint==0.9
-katsdpsigproc==1.1
+
+katdal @ git+https://github.com/ska-sa/katdal
+katpoint @ git+https://github.com/ska-sa/katpoint
+katsdpsigproc @ git+https://github.com/ska-sa/katsdpsigproc
