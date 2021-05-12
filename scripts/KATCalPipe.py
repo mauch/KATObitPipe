@@ -30,7 +30,8 @@ parser.add_option("--delaycal_mvf", default=None, type='str', help='Dataset to u
 									'will override the automatic detection of the relevant dataset. NOTE: The dataset MUST have '
 									'been observed using calibrate_delays.py just before the start of the observation. '
 									'This option is only used when --polcal is selected.')
-
+parser.add_option("--katdal_timeout", default=300, type='int', help='Timeout (in seconds) for data read in katdal')
+parser.add_option("--katdal_retries", default=2, type='int', help='Number of retries for data read in katdal')
 (options, katfilenames) = parser.parse_args()
 
 if len(katfilenames) == 0:
@@ -38,7 +39,7 @@ if len(katfilenames) == 0:
     sys.exit()
 
 kwargs = {}
-for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'polcal', 'XYtarg', 'delaycal_mvf']:
+for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'polcal', 'XYtarg', 'delaycal_mvf', 'katdal_timeout', 'katdal_retries']:
 	if getattr(options,k) != None:
 		kwargs[k] =  getattr(options,k)
 try:

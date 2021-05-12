@@ -45,7 +45,9 @@ def MKContPipeline(files, outputdir, **kwargs):
     try:
         #open katfile and perform selection according to kwargs
         katdal_ref_ant = kwargs.get('katdal_refant', '')
-        katdata = katfile.open(h5file, ref_ant=katdal_ref_ant)
+        katdal_retries = kwargs.get('katdal_retries', 2)
+        katdal_timeout = kwargs.get('katdal_timeout', 300)
+        katdata = katfile.open(h5file, ref_ant=katdal_ref_ant, timeout=katdal_timeout, retries=katdal_retries)
         OK = True
     except Exception as exception:
         print(exception)
@@ -56,7 +58,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     if kwargs.get('polcal'):
         if kwargs.get('delaycal_mvf') is None:
             # Automatically determine delay_cal CBID
-            delay_katdata = KATGetDelayCal(h5file, katdata)  
+            delay_katdata = KATGetDelayCal(h5file, katdata, timeout=katdal_timeout, retries=katdal_retries)  
         else:
             # Use the user supplied one
             delay_katdata = KATGetDelayCal(kwargs.get('delaycal_mvf'))

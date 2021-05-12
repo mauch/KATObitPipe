@@ -575,7 +575,7 @@ def KATh5Select(katdata, parms, err, **kwargs):
     if err.isErr:
         OErr.printErrMsg(err, "Error with h5 file")
 
-def KATGetDelayCal(h5file, katdata=None):
+def KATGetDelayCal(h5file, katdata=None, timeout=300, retries=2):
     """
     Try and find the delaycal observation associated with this observation
     Raise a ValueError for various reasons if we cant find it.
@@ -600,7 +600,7 @@ def KATGetDelayCal(h5file, katdata=None):
         return None
 
     if katdata is None:
-        dc_katdata = katdal.open(h5file)
+        dc_katdata = katdal.open(h5file, timeout=timeout, retries=retries)
         dc_datdata = _get_noise_diode_scan(dc_katdata)
         if dc_katdata is not None:
             return dc_katdata
