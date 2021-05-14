@@ -41,6 +41,7 @@ except Exception as exception:
     raise  RuntimeError("KAT software unavailable")
 else:
     pass
+import socket
 from collections import namedtuple
 import time,math,os
 import UV, UVVis, OErr, UVDesc, Table, History
@@ -800,7 +801,7 @@ def load(dataset, indices, vis, weights, flags, err):
                     out_weights[:] = dataset.weights[in_ts]
                     out_flags[:] = dataset.flags[in_ts]
                 break
-            except StoreUnavailable:
+            except (StoreUnavailable, socket.timeout):
                 msg = 'Timeout when reading dumps %d to %d. Try %d/%d....' % (out_ts.start + 1, out_ts.stop, i + 1, NUM_RETRIES)
                 OErr.PLog(err, OErr.Warn, msg);
                 OErr.printErr(err)
