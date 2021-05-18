@@ -117,18 +117,19 @@ def MKContPipeline(files, outputdir, **kwargs):
     parms['XYtarg'] = kwargs.get('XYtarg')
     # Get default XYtarg if it is not set
     targs = [targ.name for targ in katdata.catalogue.targets]
-    if parms['XYtarg'] is None:
-        GOTTARG = False
-        for targ in ['1934-638', '0408-65']:
-            if targ in targs:
-                parms['XYtarg'] = targ
-                GOTTARG = True
-                break
-        if not GOTTARG:
-            raise RuntimeError('No default targets (1934-638, 0408-65) for XYFix. Cannot run in PolCal mode.')
-    else:
-        if parms['XYtarg'] not in targs:
-            raise RuntimeError('XYtarg target %s not in observation. Cannot run in PolCal mode.' % (parms['XYtarg']))
+    if parms['PolCal']:
+        if parms['XYtarg'] is None:
+            GOTTARG = False
+            for targ in ['1934-638', '0408-65']:
+                if targ in targs:
+                    parms['XYtarg'] = targ
+                    GOTTARG = True
+                    break
+            if not GOTTARG:
+                raise RuntimeError('No default targets (1934-638, 0408-65) for XYFix. Cannot run in PolCal mode.')
+        else:
+            if parms['XYtarg'] not in targs:
+                raise RuntimeError('XYtarg target %s not in observation. Cannot run in PolCal mode.' % (parms['XYtarg']))
     ####### User defined parameters ######
     if kwargs.get('parmFile'):
         print("parmFile",kwargs.get('parmFile'))
