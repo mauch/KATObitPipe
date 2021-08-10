@@ -65,7 +65,7 @@ KATH5toAIPS.MakeTemplate(templatefile,filebase+'.uvfits',katdata)
 
 uv=OTObit.uvlod(filebase+'.uvfits',0,nam,cls,disk,seq,err)
 
-shutil.rmtree(templatefile)
+os.remove(filebase+'.uvfits')
 
 obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=1.0, stop_w=False, doflags=options.write_flags)
 
