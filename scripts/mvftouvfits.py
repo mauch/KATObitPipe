@@ -37,7 +37,7 @@ AIPS_VERSION = os.environ['AIPS_VERSION']
 user = OSystem.PGetAIPSuser()
 AIPS.userno = user
 disk = 1
-fitsdisk = 0
+fitsdisk = 1
 nam = filebase
 cls = "Raw"
 seq = 1
@@ -56,15 +56,16 @@ if options.channel_range:
     katdata.select(channels=chan_range)
 
 katdata.select(scans='track')
-numchans = len(katdata.channel_freqs)
 nbl = len(np.unique([(cp[0][:-1] + cp[1][:-1]).upper() for cp in katdata.corr_products]))
 
 #Condition the uvfits template
 templatefile=ObitTalkUtil.FITSDir.FITSdisks[fitsdisk]+'MKATTemplate.uvtab.gz'
 
-KATH5toAIPS.MakeTemplate(templatefile,filebase+'.uvfits',numchans,nvispio=nbl)
+KATH5toAIPS.MakeTemplate(templatefile,filebase+'.uvfits',katdata)
 
 uv=OTObit.uvlod(filebase+'.uvfits',0,nam,cls,disk,seq,err)
+
+shutil.rmtree(templatefile)
 
 obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=1.0, stop_w=False, doflags=options.write_flags)
 
@@ -73,6 +74,6 @@ if not options.leave_aips:
     KATCal.KATUVFITS(uv, filebase+'.uv', 0, err)
 
     if os.path.exists(os.environ['DA00']): shutil.rmtree(os.environ['DA00'])
-    for disk in ObitTalkUtil.AIPSDir.AIPSdisks:
-        if os.path.exists(disk): shutil.rmtree(disk)
+    d = ObitTalkUtil.AIPSDir.AIPSdisks[disk]
+    if os.path.exists(d): shutil.rmtree(d)
 
