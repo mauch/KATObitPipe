@@ -5445,7 +5445,7 @@ def KATImageTargets(uv, err, Sources=None,  FreqID=1, seq=1, sclass="IClean", ba
         #del suinfo
         # Test autoCen
         #if autoCen:
-        imager.autoCen = 0.15 #max(100.0*thermNoise,0.1)
+        #imager.autoCen = 0.15 #max(100.0*thermNoise,0.1)
         #imager.PeelFlux = 0.3
         #imager.PeelLoop =2
         #imager.PeelRefAnt=refAnt
@@ -5491,14 +5491,6 @@ def KATImageTargets(uv, err, Sources=None,  FreqID=1, seq=1, sclass="IClean", ba
                                        out2Name, out2Class, "UV", imager.out2Seq, err)
                 if cno>0:
                     u = UV.newPAUV("Self-calibrated uv data", out2Name, out2Class, imager.out2Disk, imager.out2Seq, False, err)
-                    #Save self-calibrated vis to disk
-                    filename = sou+'_selfCal.uv'
-                    KATSplatandUVFITS(u, filename, 0, err, logfile=logfile)
-
-                    #KATUVFITS(u, filename, 0, err, exclude=["AIPS HI", "AIPS SL", "AIPS PL"], include=["AIPS AN", "AIPS FQ"], compress=False, logfile=logfile)
-                    filename = sou+'_selfCal.uvtab'
-                    KATUVFITab(u, filename, 0, err)
-                    #KATSplatandUVFITS(u, sou+'_selfCal.uv', 0, err, logfile=logfile)
                     if UV.PIsA(u):
                         u.Zap(err) # cleanup
                     if err.isErr:
