@@ -363,9 +363,9 @@ def KATh5Condition(katdata, caldata, err):
     havebpcal=False
     for targ in katdata.catalogue.targets:
         #Replace spaces in the name with underscores
-        targ.name=targ.name.replace(' ','_')[0:12]
+        targ._name=targ._name.replace(' ','_')[0:12]
         #Also remove ':' which AIPS has trouble with
-        targ.name=targ.name.replace(':','_')[0:12]
+        targ._name=targ._name.replace(':','_')[0:12]
         #Get the nearest calibrator in caldata.
         fluxcal,offset=caldata.closest_to(targ)
         # Update the calibrator flux model
@@ -373,7 +373,7 @@ def KATh5Condition(katdata, caldata, err):
             # 4.0 arcseconds should be close enough...
             targ.flux_model = fluxcal.flux_model
             if targ.name != fluxcal.name:
-                targ.name = fluxcal.name
+                targ._name = fluxcal.name
         else:                            # Not a bandpass calibrator
             if 'bpcal' in targ.tags: targ.tags.remove('bpcal')
         if 'bpcal' in targ.tags:
@@ -448,7 +448,7 @@ def KATh5Select(katdata, parms, err, **kwargs):
         # Fetch data
         tm = katdata.timestamps[:]
         nint = len(tm)
-        el=target.azel(tm[int(nint/2)])[1]*180./math.pi
+        el=target.azel(tm[int(nint/2)]).alt.deg
         if el >= parms['minElev']:
             good_elevations.append(scan)
         else:   # Throw away scans at low elevation
@@ -1113,7 +1113,7 @@ def KATHann(inUV, Aname, Aclass, Adisk, Aseq, err, doDescm=True, \
             hann.g
     except Exception as exception:
         print(exception)
-        mess = "Median flagging Failed retCode="+str(hann.retCode)
+        mess = "Hanning Failed retCode="+str(hann.retCode)
         printMess(mess, logfile)
         return None
     else:
@@ -5394,13 +5394,12 @@ def KATImageTargets(uv, err, Sources=None,  FreqID=1, seq=1, sclass="IClean", ba
         imager.autoWindow  = True
     if "doComRes" in imager.__dict__:
         imager.doComRes  = doComRes
+    if autoCen:
+        imager.autoCen = autoCen
     imager.doComRes = True
     imager.noScrat     = noScrat
     imager.nThreads    = nThreads
     imager.prtLv = 5
-    #imager.MFTaper = 
-    #imager.i
-    imager.debug = True
     if debug:
         imager.prtLv = 5
         imager.i

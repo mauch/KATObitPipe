@@ -197,7 +197,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
         delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delayClass, disk, seq, err)
         KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
-        MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)     
+        MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
         os.remove(outtemplate)
     
     # Print the uv data header to screen.
@@ -268,12 +268,12 @@ def MKContPipeline(files, outputdir, **kwargs):
 
     # Hanning - only if not reusing
     doneHann = False
+    parms["doHann"] = False
     if not kwargs.get('reuse'):
         if parms["doHann"]:
             uv = KATHann(uv, EVLAAIPSName(project), dataClass, disk, seq, err, \
                       doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
             doneHann = True
-    
     if parms["PolCal"] and parms["doHann"]:
         mess = "Hanning delay calibration scan"
         printMess(mess, logFile)

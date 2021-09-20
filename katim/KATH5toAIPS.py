@@ -206,13 +206,13 @@ def GetKATMeta(katdata, err):
         t = katdata.catalogue.targets[ti]
         #Aips doesn't like spaces in names!!
         name = (t.name+"                ")[0:16]
-        ras, decs = t.radec()
-        dec = UVDesc.PDMS2Dec(str(decs).replace(':',' '))
-        ra  = UVDesc.PHMS2RA(str(ras).replace(':',' '))
+        ra, dec = t.radec().ra.deg, t.radec().dec.deg
+        #dec = UVDesc.PDMS2Dec(str(decs).replace(':',' '))
+        #ra  = UVDesc.PHMS2RA(str(ras).replace(':',' '))
         # Apparent posn
-        ras, decs = t.apparent_radec()
-        deca = UVDesc.PDMS2Dec(str(decs).replace(':',' '))
-        raa  = UVDesc.PHMS2RA(str(ras).replace(':',' '))
+        raa, deca = t.apparent_radec().ra.deg, t.apparent_radec().dec.deg
+        #deca = UVDesc.PDMS2Dec(str(decs).replace(':',' '))
+        #raa  = UVDesc.PHMS2RA(str(ras).replace(':',' '))
         #Avoid duplicates
         if name in tn:
             continue
@@ -242,7 +242,7 @@ def GetKATMeta(katdata, err):
     for a in out["newants"]:
         name  = a.name
         x,y,z = a.position_ecef
-        diam  = a.diameter
+        diam  = a.diameter.to_value('m')
         i = int(name[1:]) + 1
         antnums.append(i)
         al.append((i, name, x, y, z, diam))
@@ -557,6 +557,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
     bi      = meta["blineind"]
     nbase   = b.shape[0]                # number of correlations/baselines
     nprod   = nbase * nstok
+    uvw_indices = p[bi[:, 0], bi[:, 1], 0]
     antslookup = meta["antLookup"]
     # work out Start time in unix sec
     tm = katdata.timestamps[0]
@@ -609,7 +610,8 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
         print(msg)
 
     # Set up baseline vectors of uvw calculation
-    array_centre = katpoint.Antenna('', *newants[0].ref_position_wgs84)
+    lon, lat, elev = newants[0].ref_position_wgs84
+    array_centre = katpoint.Antenna(f'poo, {lon}, {lat}, {elev}')#, *newants[0].ref_position_wgs84)
     baseline_vectors = numpy.array([array_centre.baseline_toward(antenna)
                                 for antenna in newants])
 
@@ -666,9 +668,14 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
 
             numflags += numpy.sum(fg)
             numvis += fg.size
-
             # uvw calculation
-            uvw_coordinates = get_uvw_coordinates(array_centre, baseline_vectors, tm, target, bi)
+
+            #uvw_coordinates_old = get_uvw_coordinates(array_centre, baseline_vectors, tm, target, bi)
+
+            u = katdata.u[sl, uvw_indices]
+            v = katdata.v[sl, uvw_indices]
+            w = katdata.w[sl, uvw_indices]
+            uvw_coordinates = numpy.stack((u, v, w), axis=-1)
 
             # Convert to aipsish
             uvw_coordinates /= lamb
