@@ -47,7 +47,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         katdal_ref_ant = kwargs.get('katdal_refant', '')
         katdal_retries = kwargs.get('katdal_retries', 2)
         katdal_timeout = kwargs.get('katdal_timeout', 300)
-        katdata = katfile.open(h5file, ref_ant=katdal_ref_ant, timeout=katdal_timeout, retries=katdal_retries)
+        katdata = katfile.open(h5file, ref_ant=katdal_ref_ant, timeout=katdal_timeout, retries=katdal_retries, applycal='l0.KRETRACK')
         OK = True
     except Exception as exception:
         print(exception)
@@ -599,6 +599,9 @@ def MKContPipeline(files, outputdir, **kwargs):
     # Overwrite avgStokes from command line
     if kwargs.get('halfstokes'):
         parms["avgStokes"] = 'HALF'
+    parms["doCalAvg"] = 'Splat'
+    parms["avgFreq"] = 0
+    parms["chAvg"] = 1
     if parms["doCalAvg"] == 'Splat':
         retCode = KATCalAvg (uv, avgClass, parms["seq"], parms["CalAvgTime"], err, \
                               flagVer=2, doCalib=2, gainUse=0, doBand=1, BPVer=0, doPol=False, \

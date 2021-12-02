@@ -671,12 +671,13 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             # uvw calculation
 
             #uvw_coordinates_old = get_uvw_coordinates(array_centre, baseline_vectors, tm, target, bi)
-
+            print("UVW")
+            st = time.time()
             u = katdata.u[sl, uvw_indices]
             v = katdata.v[sl, uvw_indices]
             w = katdata.w[sl, uvw_indices]
             uvw_coordinates = numpy.stack((u, v, w), axis=-1)
-
+            print(time.time() - st)
             # Convert to aipsish
             uvw_coordinates /= lamb
 
@@ -883,7 +884,7 @@ def get_baseline_mask(ants, corr_prods, limit):
         antlookup[ant.name] = ant
     for prod, baseline in enumerate(corr_prods):
         bl_vector = antlookup[baseline[0][:4]].baseline_toward(antlookup[baseline[1][:4]])
-        bl_length = numpy.linalg.norm(bl_vector)
+        bl_length = bl_vector.norm().to_value('m')
         if bl_length < limit:
             baseline_mask[prod] = True
     return baseline_mask

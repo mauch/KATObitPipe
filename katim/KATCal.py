@@ -321,22 +321,22 @@ def KATGetObsParms(obsdata, katdata, parms, logFile):
     antennas = obsdata["katdata"].ants
     longBline = 0.0
     for ant1,ant2 in itertools.combinations(antennas,2):
-        thisBline=np.linalg.norm(ant1.baseline_toward(ant2))
+        thisBline=ant1.baseline_toward(ant2).norm().to_value('m')
         if thisBline>longBline:
             longBline=thisBline
     parms["longBline"] = longBline
 
     # Create the editlist array for static flags (on instantiation it contains a flag of the middle channel).
-    editList = KAT7EditList(parms["selChan"])
+    #editList = KAT7EditList(parms["selChan"])
     parms=KATInitContFQParms(katdata, parms)
     # Get bad antennas and update editlist with these
-    if parms["doBadAnt"]:
-        badants = KATGetBadAnts(obsdata,(0,len(katdata.channel_freqs)))
-        for badant in badants:
-            mess = "Flagging "+list(obsdata['antLookup'].keys())[list(obsdata['antLookup'].values()).index(badant['Ant'][0])]
-            printMess(mess,logFile)
-        parms["editList"]=parms["editList"] + badants
-
+    #if parms["doBadAnt"]:
+    #    badants = KATGetBadAnts(obsdata,(0,len(katdata.channel_freqs)))
+    #    for badant in badants:
+    #        mess = "Flagging "+list(obsdata['antLookup'].keys())[list(obsdata['antLookup'].values()).index(badant['Ant'][0])]
+    #        printMess(mess,logFile)
+    #    parms["editList"]=parms["editList"] + badants
+    #print(editList)
     return parms
 
 def KATh5Condition(katdata, caldata, err):
@@ -369,7 +369,7 @@ def KATh5Condition(katdata, caldata, err):
         #Get the nearest calibrator in caldata.
         fluxcal,offset=caldata.closest_to(targ)
         # Update the calibrator flux model
-        if offset*3600.0 < 4.0 and 'bpcal' in targ.tags:
+        if offset.arcsec < 4.0 and 'bpcal' in targ.tags:
             # 4.0 arcseconds should be close enough...
             targ.flux_model = fluxcal.flux_model
             if targ.name != fluxcal.name:
