@@ -106,7 +106,7 @@ def MKContPipeline(files, outputdir, **kwargs):
 
     ############### Condition data #########################
     #Get calibrator models
-    fluxcals = katpoint.Catalogue(open(FITSDir.FITSdisks[1]+"/PERLEY_BUTLER_2013.csv"))
+    fluxcals = katpoint.Catalogue(open(FITSDir.FITSdisks[fitsdisk]+"/PERLEY_BUTLER_2013.csv"))
     #Condition data (get bpcals, update names for aips conventions etc)
     KATh5Condition(katdata, fluxcals, err)
 
@@ -139,6 +139,8 @@ def MKContPipeline(files, outputdir, **kwargs):
     ###################### Data selection and static edits ############################################
     # Select data based on static imageable parameters
     KATh5Select(katdata, parms, err, **kwargs)
+    # Generate RFI Mask
+    sflags = KATInitRFIMask(katdata, parms['RFIMask'], fitsdisk, logFile)
 
     # General AIPS data parameters at script level
     dataClass = ("UVDa")[0:6]      # AIPS class of raw uv data
@@ -150,25 +152,10 @@ def MKContPipeline(files, outputdir, **kwargs):
     check     = parms["check"]
 
     ####################### Import data into AIPS #####################################################
-    # Reuse or nay?
-    sw = katdata.spectral_windows[katdata.spw]
-    # Pick up static flags
-    if sw.band == 'L':
-        sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle')
-        if kwargs.get('flag', None):
-            mess = 'Using static RFI mask in file %s for L-band' % (ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskred.pickle',)
-            printMess(mess, logFile)
-    elif sw.band == 'UHF':
-        sflags = FetchObject(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle')
-        if kwargs.get('flag', None):
-            mess = 'Using static RFI mask in file %s for UHF-band' % (ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'maskredUHF.pickle',)
-            printMess(mess, logFile)
-    else:
-        sflags = np.zeros(sw.num_chans, dtype=np.bool)
-    sflags = sflags[katdata.channels]
     # Construct a template uvfits file from master template
     mastertemplate = ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'MKATTemplate.uvtab.gz'
     outtemplate = nam + '.uvtemp'
+    # Reuse or nay?
     if kwargs.get('reuse'):
         uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), dataClass, disk, seq, True, err)
         obsdata = KATH5toAIPS.GetKATMeta(katdata, err)
