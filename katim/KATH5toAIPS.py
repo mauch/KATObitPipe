@@ -37,8 +37,8 @@ try:
     import katpoint
 except Exception as exception:
     print(exception)
-    print("KAT software not available")
-    raise  RuntimeError("KAT software unavailable")
+    print("katdal software not available")
+    raise  RuntimeError("katdal software unavailable")
 else:
     pass
 import socket
@@ -623,7 +623,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
         # Don't read at all if all will be "Quacked"
         if katdata.shape[0] < ((QUACK + 1) * timeav):
             continue
-
         # Chunk data into max_scan dumps
         if katdata.shape[0] > max_scan:
             scan_slices = [slice(i, i + max_scan, 1) for i in range(QUACK * timeav, katdata.shape[0], max_scan)]
