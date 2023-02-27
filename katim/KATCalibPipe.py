@@ -3,6 +3,7 @@ import OErr, OSystem, UV, AIPS, FITS, OTObit
 import ObitTalkUtil
 from AIPS import AIPSDisk
 from FITS import FITSDisk
+from AIPSDir import PHiSeq
 from PipeUtil import *
 from .KATCal import *
 import h5py
@@ -170,7 +171,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     mastertemplate = ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'MKATTemplate.uvtab.gz'
     outtemplate = nam + '.uvtemp'
     if kwargs.get('reuse'):
-        uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), dataClass, disk, seq, True, err)
+        uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), dataClass, seq, disk, True, err)
         obsdata = KATH5toAIPS.GetKATMeta(katdata, err)
         # Extract AIPS parameters of the uv data to the metadata
         obsdata["Aproject"] = uv.Aname
@@ -189,16 +190,21 @@ def MKContPipeline(files, outputdir, **kwargs):
         obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
         MakeIFs.UVMakeIF(uv,8,err,solInt=katdata.dump_period)
         os.remove(outtemplate)
-
+    delay_exists = False
+    delay_seq = PHiSeq(disk, user, EVLAAIPSName(project), delayClass, 'UV', err)
     if parms["PolCal"]:
-        mess = '\nLoading delay calibration with CBID: %s' % (delay_katdata.obs_params['capture_block_id'],)
-        printMess(mess, logFile)
-        # Load the delay cal observation
-        KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
-        delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delayClass, disk, seq, err)
-        KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
-        MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)     
-        os.remove(outtemplate)
+        delay_exists = UV.AExist(EVLAAIPSName(project), delayClass, disk, delay_seq, err)
+        if kwargs.get('reuse') and delay_exists:
+            delay_uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), delayClass, disk, delay_seq, True, err)
+        else:
+            mess = '\nLoading delay calibration with CBID: %s' % (delay_katdata.obs_params['capture_block_id'],)
+            printMess(mess, logFile)
+            # Load the delay cal observation
+            KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
+            delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delayClass, disk, seq, err)
+            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
+            MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
+            os.remove(outtemplate)
     
     # Print the uv data header to screen.
     uv.Header(err)
@@ -220,7 +226,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     ################### Start processing ###############################################################
 
     mess = "Start project "+parms["project"]+" AIPS user no. "+str(AIPS.userno)+\
-           ", KAT7 configuration "+parms["KAT7Cfg"]
+           ", MeerKAT configuration "+parms["KAT7Cfg"]
     printMess(mess, logFile)
     if debug:
         pydoc.ttypager = pydoc.plainpager # don't page task input displays
@@ -267,18 +273,18 @@ def MKContPipeline(files, outputdir, **kwargs):
     loadClass = dataClass
 
     # Hanning - only if not reusing
-    doneHann = False
     if not kwargs.get('reuse'):
         if parms["doHann"]:
             uv = KATHann(uv, EVLAAIPSName(project), dataClass, disk, seq, err, \
-                      doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
+                doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
             doneHann = True
-    
-    if parms["PolCal"] and parms["doHann"]:
+    # What about Hanning the polarisation calibrator?
+    # Only if delaycal file didn't exist
+    if parms["PolCal"] and parms["doHann"] and not delay_exists:
         mess = "Hanning delay calibration scan"
         printMess(mess, logFile)
         delay_uv = KATHann(delay_uv, EVLAAIPSName(project), delayClass, disk, seq + 1, err, \
-                        doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
+            doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
 
     if doneHann:
         # Halve channels after hanning.
