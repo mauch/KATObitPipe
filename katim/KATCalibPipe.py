@@ -144,13 +144,16 @@ def MKContPipeline(files, outputdir, **kwargs):
     sflags = KATInitRFIMask(katdata, parms['RFIMask'], fitsdisk, logFile)
 
     # General AIPS data parameters at script level
-    dataClass = ("UVDa")[0:6]      # AIPS class of raw uv data
-    delayClass = "DELA"
-    band      = katdata.spectral_windows[0].product #Correlator product
+    data_class =  "UVDa"      # AIPS class of raw uv data
+    delay_class = "DELA"    
+    band      = katdata.spectral_windows[0].product # Correlator product
     project   = os.path.basename(os.path.splitext(files[0])[0])[0:10]  # Project name (12 char or less, used as AIPS Name)
     outIClass = parms["outIClass"] # image AIPS class
     debug     = parms["debug"]
     check     = parms["check"]
+    # Seq is 2 if Hanning, 1 if not.
+    data_seq  = PHiSeq(disk, user, EVLAAIPSName(project), data_class, 'UV', err)
+    delay_seq = PHiSeq(disk, user, EVLAAIPSName(project), delay_class, 'UV', err)
 
     ####################### Import data into AIPS #####################################################
     # Construct a template uvfits file from master template
@@ -158,7 +161,10 @@ def MKContPipeline(files, outputdir, **kwargs):
     outtemplate = nam + '.uvtemp'
     # Reuse or nay?
     if kwargs.get('reuse'):
-        uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), dataClass, seq, disk, True, err)
+        exists = UV.AExist(EVLAAIPSName(project), data_class, disk, data_seq, err)
+        if not exists:
+            raise IOError('UV data not found in aipsdisk. Perhaps try without --reuse?')
+        uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), data_class, disk, data_seq, True, err)
         obsdata = KATH5toAIPS.GetKATMeta(katdata, err)
         # Extract AIPS parameters of the uv data to the metadata
         obsdata["Aproject"] = uv.Aname
@@ -173,22 +179,21 @@ def MKContPipeline(files, outputdir, **kwargs):
         mess = '\nLoading UV data with CBID: %s' % (katdata.obs_params['capture_block_id'],)
         printMess(mess, logFile)
         KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
-        uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), clss, disk, seq, err)
+        uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), data_class, disk, data_seq, err)
         obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
         MakeIFs.UVMakeIF(uv,8,err,solInt=katdata.dump_period)
         os.remove(outtemplate)
     delay_exists = False
-    delay_seq = PHiSeq(disk, user, EVLAAIPSName(project), delayClass, 'UV', err)
     if parms["PolCal"]:
-        delay_exists = UV.AExist(EVLAAIPSName(project), delayClass, disk, delay_seq, err)
+        delay_exists = UV.AExist(EVLAAIPSName(project), delay_class, disk, delay_seq, err)
         if kwargs.get('reuse') and delay_exists:
-            delay_uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), delayClass, disk, delay_seq, True, err)
+            delay_uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), delay_class, disk, delay_seq, True, err)
         else:
             mess = '\nLoading delay calibration with CBID: %s' % (delay_katdata.obs_params['capture_block_id'],)
             printMess(mess, logFile)
             # Load the delay cal observation
             KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
-            delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delayClass, disk, seq, err)
+            delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delay_class, disk, seq, err)
             KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
             MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
             os.remove(outtemplate)
@@ -257,27 +262,21 @@ def MKContPipeline(files, outputdir, **kwargs):
     ParmsPicklefile = fileRoot+".Parms.pickle"   # Where results saved
     SaveObject(parms, ParmsPicklefile, True)
     EVLAAddOutFile(os.path.basename(ParmsPicklefile), 'project', 'Processing parameters used' )
-    loadClass = dataClass
 
     # Hanning - only if not reusing
-    if not kwargs.get('reuse'):
-        if parms["doHann"]:
-            uv = KATHann(uv, EVLAAIPSName(project), dataClass, disk, seq, err, \
-                doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
-            doneHann = True
-    # What about Hanning the polarisation calibrator?
-    # Only if delaycal file didn't exist
-    if parms["PolCal"] and parms["doHann"] and not delay_exists:
-        mess = "Hanning delay calibration scan"
-        printMess(mess, logFile)
-        delay_uv = KATHann(delay_uv, EVLAAIPSName(project), delayClass, disk, seq + 1, err, \
-            doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, check=check, debug=debug)
-
-    if doneHann:
-        # Halve channels after hanning.
-        parms["selChan"]=int(parms["selChan"]/2)
-        parms["BChDrop"]=int(parms["BChDrop"]/2)
-        parms["EChDrop"]=int(parms["EChDrop"]/2)
+    if parms["doHann"]:
+        if not kwargs.get('reuse'):
+            uv = KATHann(uv, EVLAAIPSName(project), data_class, disk, data_seq + 1, err, \
+                doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, zapin=True, \
+                check=check, debug=debug)
+        # What about Hanning the polarisation calibrator?
+        # Only if delaycal file didn't exist
+        if parms["PolCal"] and not delay_exists:
+            mess = "Hanning delay calibration scan"
+            printMess(mess, logFile)
+            delay_uv = KATHann(delay_uv, EVLAAIPSName(project), delay_class, disk, \
+                delay_seq + 1, err, doDescm=parms["doDescm"], flagVer=-1, logfile=logFile, \
+                zapin=True, check=check, debug=debug)
         if uv==None and not check:
             raise RuntimeError("Cannot Hann data ")
 
@@ -596,7 +595,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         retCode = KATCalAvg (uv, avgClass, parms["seq"], parms["CalAvgTime"], err, \
                               flagVer=2, doCalib=2, gainUse=0, doBand=1, BPVer=0, doPol=False, \
                               avgFreq=parms["avgFreq"], chAvg=parms["chAvg"], Stokes=parms["avgStokes"], \
-                              BChan=1, EChan=parms["selChan"] - 1, doAuto=parms["doAuto"], \
+                              BChan=1, EChan=0, doAuto=parms["doAuto"], \
                               BIF=parms["CABIF"], EIF=parms["CAEIF"], Compress=parms["Compress"], \
                               nThreads=nThreads, logfile=logFile, check=check, debug=debug)
         if retCode!=0:
@@ -606,7 +605,7 @@ def MKContPipeline(files, outputdir, **kwargs):
                               flagVer=2, doCalib=2, gainUse=0, doBand=1, BPVer=0, doPol=False, \
                               avgFreq=parms["avgFreq"], chAvg=parms["chAvg"], FOV=parms['FOV'], \
                               maxInt=min(parms["solPInt"],parms["solAInt"]), Stokes=parms["avgStokes"], \
-                              BChan=1, EChan=parms["selChan"] - 1, timeAvg=parms["CalAvgTime"], \
+                              BChan=1, EChan=0, timeAvg=parms["CalAvgTime"], \
                               BIF=parms["CABIF"], EIF=parms["CAEIF"], Compress=parms["Compress"], \
                               logfile=logFile, check=check, debug=debug)
         if retCode!=0:
