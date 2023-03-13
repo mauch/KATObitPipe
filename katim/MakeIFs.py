@@ -282,9 +282,10 @@ def DescAddIF (inUV, outUV, nIF, err):
     UV. PGetIODesc(outUV).Dict = d  # And your little dog too
     # Update
     outUV.UpdateDesc(err)
-    outUV.Open(UV.WRITEONLY,err)
+    outUV.Open(UV.WRITEONLY, err)
     outUV.Close(err)
-    #outUV.Header(err)
+    outUV.Open(UV.READWRITE, err)
+    outUV.Close(err)
     OErr.printErrMsg(err,"Error converting Descriptor")
     # end DescAddIF
     

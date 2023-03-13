@@ -46,7 +46,7 @@ def KATInitContParms():
     parms["check"]         = False      # Only check script, don't execute tasks
     parms["debug"]         = False      # run tasks debug
     parms["fluxModel"]     = "PERLEY_BUTLER_2013.csv" # Filename of flux calibrator model (in FITS)
-    parms["staticflags"]   = "KAT7_SRFI"              # Filename containing a list of frequencies to be flagged (in FITS)
+    parms["RFIMask"]       = ""    # Path to pickle containing RFI mask (overrides default) 
 
     # User Supplied data parameters
     parms["BPCal"] = []
@@ -294,6 +294,60 @@ def KATInitContParms():
     return parms
 
 # end KAT-7 InitContParms
+
+def KATInitRFIMask(katdata, usermask, fitsdisk, logFile):
+    """Initialise the RFI mask.
+
+    Either use the user supplied mask or the default RFI mask stored in FITSdir.
+    If the default is used it will be resampled to the correct number of channels.
+    User supplied mask must have the same number of channels as the katdata dataset.
+
+    Inputs:
+    katdata: :class:mvfdata 
+        Katdal dataset
+    usermask: str
+        Path to user supplied mask file. Empty string means use default.
+    fitsdisk: int
+        FITS disk number containing default RFI Mask
+    logFile: str
+        Path to Obit logging
+
+    Returns:
+    Numpy array of bool containing the mask channels.
+    (from remaining selection in katdata object)
+    """
+
+    sw = katdata.spectral_windows[katdata.spw]
+    sflags = np.zeros(sw.num_chans, dtype=np.bool)
+
+    if usermask is '':
+        # No user supplied mask
+        sw = katdata.spectral_windows[katdata.spw]
+        # Pick up static flags default file
+        maskfilename = 'mask' + sw.band + '.pickle'
+        maskfile = os.path.join(ObitTalkUtil.FITSDir.FITSdisks[fitsdisk], maskfilename)
+        sflags = FetchObject(maskfile)
+        if sflags is not None:
+            # We have a default!!
+            mess = 'Using static RFI mask in file %s for %s-band' % (maskfile, sw.band)
+            printMess(mess, logFile)
+            # Extend flags to channelisation of input data
+            sflags = np.repeat(sflags, sw.num_chans // 1024)
+        else:
+            # No mask!
+            sflags = np.zeros(sw.num_chans, dtype=np.bool)
+    else:
+        # Get User supplied mask
+        sflags = FetchObject(usermask)
+        if sflags is not None:
+            mess = 'Using static RFI mask in supplied file: %s' % (usermask,)
+            printMess(mess, logFile)
+        else:
+            raise ValueError("User supplied mask file %s not found." % (usermask,))
+    
+    sflags = sflags[katdata.channels]
+
+    return sflags
 
 def KATGetObsParms(obsdata, katdata, parms, logFile):
     """

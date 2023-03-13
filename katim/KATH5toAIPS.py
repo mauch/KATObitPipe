@@ -37,8 +37,8 @@ try:
     import katpoint
 except Exception as exception:
     print(exception)
-    print("KAT software not available")
-    raise  RuntimeError("KAT software unavailable")
+    print("katdal software not available")
+    raise  RuntimeError("katdal software unavailable")
 else:
     pass
 import socket
