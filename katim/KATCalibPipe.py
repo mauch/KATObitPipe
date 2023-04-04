@@ -194,7 +194,7 @@ def MKContPipeline(files, outputdir, **kwargs):
             # Load the delay cal observation
             KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
             delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delay_class, disk, seq, err)
-            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
+            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False, antphase_adjust_filename=kwargs.get('antphase_adjust_filename',None))
             MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
             os.remove(outtemplate)
     

@@ -88,8 +88,10 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
         Calibration interval in min.
     targets : list, optinal
         List of targetnames to extract from the file
-    stop_w : bool
-        Fring stop data? (Values only for KAT-7)
+    antphase_adjust_filename : string or None
+        filename to numpy .npz file containing phase adjustment per input per channel 
+        to be applied to all raw visibilities before further processing.
+        npz file contains, e.g. antphasedict_rad={'freqMHz':np.linspace(856,1712,4096,endpoint=False),'m000h':np.zeros(nchans),'m000v':np.zeros(nchans), etc for other inputs};np.savez('antphase_file.npz',**(antphasedict_rad));antphasedict_rad=dict(np.load('antphase_file.npz'))
     """
     ################################################################
     OErr.PLog(err, OErr.Info, "Converting MVF data to AIPS UV format.")
@@ -120,7 +122,7 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     WriteSUTable (outUV, meta, err)
 
     # Convert data
-    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), stop_w=kwargs.get('stop_w',False), timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',True), doflags=kwargs.get('doflags',True))
+    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), antphase_adjust_filename=kwargs.get('antphase_adjust_filename',None), timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',True), doflags=kwargs.get('doflags',True))
 
     # Index data
     OErr.PLog(err, OErr.Info, "Indexing data")
@@ -536,7 +538,7 @@ def StopFringes(visData,freqData,cable_delay):
     return outVisData
 
 
-def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=False, timeav=1, flag=False, doweight=True, doflags=True):
+def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphase_adjust_filename=None, timeav=1, flag=False, doweight=True, doflags=True):
     """
     Read KAT HDF data and write Obit UV
 
@@ -601,12 +603,33 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
     visno = 1
     numflags = 0
     numvis = 0
-    # Do we need to stop Fringes
-    if stop_w:
-        msg = "W term in UVW coordinates will be used to stop the fringes."
-        OErr.PLog(err, OErr.Info, msg)
-        OErr.printErr(err)
-        print(msg)
+    if antphase_adjust_filename is not None:
+        #dictionary with items e.g. antphasedict_rad={'freqMHz':np.linspace(856,1712,4096,endpoint=False),'m000h':np.zeros(nchans),'m000v':np.zeros(nchans)}
+        antphasedict_rad=dict(np.load(antphase_adjust_filename))
+        #check all is OK (any inputs missing, channels match)
+        missinginputs=[]
+        for input0 in h5.inputs:
+            if input0 not in antphasedict_rad:
+                missinginputs.append(input0)
+        if len(missinginputs):
+            msg='Warning: The phase adjustment is set to zero for the following inputs that are missing from %s: %s'%(antphase_adjust_filename,','.join(missinginputs))
+            OErr.PLog(err, OErr.Info, msg)
+            OErr.printErr(err)
+            print(msg)
+            for input0 in missinginputs:
+                antphasedict_rad[input0]=np.zeros(len(antphasedict_rad['freqMHz']))
+        if (h5.channel_width/1e6!=antphasedict_rad['freqMHz'][1]-antphasedict_rad['freqMHz'][0]):
+            msg='Error: channel_width (%g MHz) does not match that of %s (%g MHz)'%(h5.channel_width/1e6,antphase_adjust_filename,antphasedict_rad['freqMHz'][1]-antphasedict_rad['freqMHz'][0])
+            OErr.PLog(err, OErr.Info, msg)
+            OErr.printErr(err)
+            print(msg)
+        if (h5.channels[-1]>len(antphasedict_rad['freqMHz'])):
+            msg='Error: incorrect number of channels (%d) in %s'%(len(antphasedict_rad['freqMHz']),antphase_adjust_filename)
+            OErr.PLog(err, OErr.Info, msg)
+            OErr.printErr(err)
+            print(msg)
+    else:
+        antphasedict_rad=None
 
     # Set up baseline vectors of uvw calculation
     array_centre = katpoint.Antenna('', *newants[0].ref_position_wgs84)
@@ -646,6 +669,9 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             if doweight==False:
                 wt[:] = 1.
             vs = scan_vs[:nint]
+            if antphasedict_rad is not None:
+                for iprod,(input0,input1) in enumerate(katdata.corr_products):
+                    vs[:,:,iprod]*=np.exp(1j*(antphasedict_rad[input0][katdata.channels]-antphasedict_rad[input1][katdata.channels]))[np.newaxis,:]
             fg = scan_fg[:nint]
             if doflags==False:
                 fg[:] = False
