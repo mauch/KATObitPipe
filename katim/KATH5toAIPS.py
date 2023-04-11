@@ -65,7 +65,7 @@ _history_wrapper = TextWrapper(width=70, initial_indent='',
                                break_long_words=True)
 
 def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
-              calInt=1.0, static=None, **kwargs):
+              calInt=1.0, static=None, antphase_adjust_filename=None, **kwargs):
     """Convert MeerKAT MVF data set to an Obit UV.
 
     This module requires katdat and katpoint and their dependencies
@@ -122,7 +122,7 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     WriteSUTable (outUV, meta, err)
 
     # Convert data
-    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), antphase_adjust_filename=kwargs.get('antphase_adjust_filename',None), timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',True), doflags=kwargs.get('doflags',True))
+    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), antphase_adjust_filename=antphase_adjust_filename, timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',True), doflags=kwargs.get('doflags',True))
 
     # Index data
     OErr.PLog(err, OErr.Info, "Indexing data")
@@ -538,44 +538,48 @@ def StopFringes(visData,freqData,cable_delay):
     return outVisData
 
 
-def load_antphasedict(antphase_adjust_filename,katdata):
+def load_antphasedict(antphase_adjust_filename, katdata, err):
     """Blame mattieu@sarao.ska.ac.za"""
-    if antphase_adjust_filename is not None:
-        #dictionary with items e.g. antphasedict_rad={'freqMHz':np.linspace(856,1712,4096,endpoint=False),'m000h':np.zeros(nchans),'m000v':np.zeros(nchans)}
-        antphasedict_rad=dict(np.load(antphase_adjust_filename))
-        #check all is OK (any inputs missing, channels match)
-        missinginputs=[]
-        for input0 in katdata.inputs:
-            if input0 not in antphasedict_rad:
-                missinginputs.append(input0)
-        if len(missinginputs):
-            msg='Warning: The phase adjustment is set to zero for the following inputs that are missing from %s: %s'%
-                (antphase_adjust_filename,','.join(missinginputs))
-            OErr.PLog(err, OErr.Info, msg)
-            OErr.printErr(err)
-            print(msg)
-            for input0 in missinginputs:
-                antphasedict_rad[input0]=np.zeros(len(antphasedict_rad['freqMHz']))
-        if (katdata.channel_width/1e6!=antphasedict_rad['freqMHz'][1]-antphasedict_rad['freqMHz'][0]):
-            msg='Error: channel_width (%g MHz) does not match that of %s (%g MHz)'%
-                (katdata.channel_width/1e6,antphase_adjust_filename,antphasedict_rad['freqMHz'][1]-antphasedict_rad['freqMHz'][0])
-            OErr.PLog(err, OErr.Info, msg)
-            OErr.printErr(err)
-            print(msg)
-            return None
-        if (katdata.channels[-1]>len(antphasedict_rad['freqMHz'])):
-            msg='Error: incorrect number of channels (%d) in %s'%
-                (len(antphasedict_rad['freqMHz']),antphase_adjust_filename)
-            OErr.PLog(err, OErr.Info, msg)
-            OErr.printErr(err)
-            print(msg)
-            return None
-    else:
+    if antphase_adjust_filename is None:
+        return None
+    msg='Adjusting visibility phases from file: %s\n'%(antphase_adjust_filename)
+    OErr.PLog(err, OErr.Info, msg)
+    OErr.printErr(err)
+    print(msg)
+    #dictionary with items e.g. antphasedict_rad={'freqMHz':np.linspace(856,1712,4096,endpoint=False),'m000h':np.zeros(nchans),'m000v':np.zeros(nchans)}
+    antphasedict_rad=dict(numpy.load(antphase_adjust_filename))
+    #check all is OK (any inputs missing, channels match)
+    missinginputs=[]
+    for input0 in katdata.inputs:
+        if input0 not in antphasedict_rad:
+            missinginputs.append(input0)
+    if len(missinginputs):
+        msg='Warning: The phase adjustment is set to zero for the following inputs that are missing from %s: %s'% \
+            (antphase_adjust_filename,','.join(missinginputs))
+        OErr.PLog(err, OErr.Info, msg)
+        OErr.printErr(err)
+        print(msg)
+        for input0 in missinginputs:
+            antphasedict_rad[input0]=np.zeros(len(antphasedict_rad['freqMHz']))
+    if (katdata.channel_width/1e6!=antphasedict_rad['freqMHz'][1]-antphasedict_rad['freqMHz'][0]):
+        msg='Error: channel_width (%g MHz) does not match that of %s (%g MHz)'% \
+            (katdata.channel_width/1e6,antphase_adjust_filename,antphasedict_rad['freqMHz'][1]-antphasedict_rad['freqMHz'][0])
+        OErr.PLog(err, OErr.Info, msg)
+        OErr.printErr(err)
+        print(msg)
+        return None
+    if (katdata.channels[-1]>len(antphasedict_rad['freqMHz'])):
+        msg='Error: incorrect number of channels (%d) in %s'% \
+            (len(antphasedict_rad['freqMHz']),antphase_adjust_filename)
+        OErr.PLog(err, OErr.Info, msg)
+        OErr.printErr(err)
+        print(msg)
         return None
     antphasedict_exp={}
-    for key,value in antphasedict_rad:
-        antphasedict_exp[key]=np.exp(1j*value)
+    for key,value in antphasedict_rad.items():
+        antphasedict_exp[key]=numpy.exp(1j*value)
     return antphasedict_exp
+
 
 def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphase_adjust_filename=None, timeav=1, flag=False, doweight=True, doflags=True):
     """
@@ -644,7 +648,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
     numvis = 0
     
     #load per-antenna,per-channel phase adjustment, if any, from file to apply to visibilities later
-    antphasedict_exp=load_antphasedict(antphase_adjust_filename,katdata)
+    antphasedict_exp=load_antphasedict(antphase_adjust_filename, katdata, err)
     
     # Set up baseline vectors of uvw calculation
     array_centre = katpoint.Antenna('', *newants[0].ref_position_wgs84)
