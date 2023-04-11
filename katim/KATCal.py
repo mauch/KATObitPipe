@@ -291,6 +291,9 @@ def KATInitContParms():
     parms["doHTML"]        =  True       # Output HTML report
     parms["doVOTable"]     =  True       # VOTable
 
+    #phase adjustment of visibilities
+    parms["antphase_adjust_filename"]   = None #string of npz filename containing dictionary of phase adjustment items per input and channel
+    
     return parms
 
 # end KAT-7 InitContParms
