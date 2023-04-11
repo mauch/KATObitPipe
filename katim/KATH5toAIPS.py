@@ -691,7 +691,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
             if antphasedict_exp is not None:#applies if antphasedict if supplied
                 for iprod,(input0,input1) in enumerate(katdata.corr_products):
                     expadj=antphasedict_exp[input0][katdata.channels]/antphasedict_exp[input1][katdata.channels]
-                    vs[:,:,iprod]=vs[:,:,iprod]*expadj[np.newaxis,:]
+                    vs[:,:,iprod]=vs[:,:,iprod]*expadj[numpy.newaxis,:]
             fg = scan_fg[:nint]
             if doflags==False:
                 fg[:] = False
