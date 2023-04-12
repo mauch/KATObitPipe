@@ -65,7 +65,8 @@ _history_wrapper = TextWrapper(width=70, initial_indent='',
                                break_long_words=True)
 
 def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
-              calInt=1.0, static=None, antphase_adjust_filename=None, **kwargs):
+              calInt=1.0, static=None, antphase_adjust_filename=None, \
+              quack=1, **kwargs):
     """Convert MeerKAT MVF data set to an Obit UV.
 
     This module requires katdat and katpoint and their dependencies
@@ -86,12 +87,11 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
         Obit error/message stack
     calInt : 
         Calibration interval in min.
-    targets : list, optinal
-        List of targetnames to extract from the file
     antphase_adjust_filename : string or None
         filename to numpy .npz file containing phase adjustment per input per channel 
         to be applied to all raw visibilities before further processing.
         npz file contains, e.g. antphasedict_rad={'freqMHz':np.linspace(856,1712,4096,endpoint=False),'m000h':np.zeros(nchans),'m000v':np.zeros(nchans), etc for other inputs};np.savez('antphase_file.npz',**(antphasedict_rad));antphasedict_rad=dict(np.load('antphase_file.npz'))
+    quack : number of dumps to drop from the start of each scan
     """
     ################################################################
     OErr.PLog(err, OErr.Info, "Converting MVF data to AIPS UV format.")
@@ -122,7 +122,10 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
     WriteSUTable (outUV, meta, err)
 
     # Convert data
-    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10), antphase_adjust_filename=antphase_adjust_filename, timeav=kwargs.get('timeav',1), flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',True), doflags=kwargs.get('doflags',True))
+    ConvertKATData(outUV, katdata, meta, err, static=static, blmask=kwargs.get('blmask',1.e10),
+                   antphase_adjust_filename=antphase_adjust_filename, timeav=kwargs.get('timeav',1),
+                   flag=kwargs.get('flag',False), doweight=kwargs.get('doweight',True),
+                   doflags=kwargs.get('doflags',True), quack=quack)
 
     # Index data
     OErr.PLog(err, OErr.Info, "Indexing data")
@@ -577,19 +580,28 @@ def load_phase_correction(antphase_adjust_filename, katdata, err):
         return None
     phase_corr = numpy.zeros(katdata.shape[1:], dtype=katdata.vis.dtype)
     for iprod,(input0,input1) in enumerate(katdata.corr_products):
-        phase_corr[:,iprod]=numpy.exp(antphasedict_rad[input0][katdata.channels] -
-                                      antphasedict_rad[input1][katdata.channels])
+        phase_corr[:,iprod]=numpy.exp(1j*(antphasedict_rad[input0][katdata.channels] -
+                                      antphasedict_rad[input1][katdata.channels]))
     return phase_corr
 
 
-def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphase_adjust_filename=None, timeav=1, flag=False, doweight=True, doflags=True):
+def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphase_adjust_filename=None,
+                   timeav=1, flag=False, doweight=True, doflags=True, quack=1):
     """
     Read KAT HDF data and write Obit UV
 
-     * outUV    = Obit UV object
-     * katdata  = input KAT dataset
-     * meta     = dict with data meta data
-     * err      = Python Obit Error/message stack to init
+     outUV    = Obit UV object
+     katdata  = input KAT dataset
+     meta     = dict with meta data
+     err      = Python Obit Error/message stack to init
+     static   = Numpy array of static flags per channel
+     blmask   = Baseline length in metres to apply the mask
+     antphase_adjust_filename = Path to npz file contain per antenna phase adjustment
+     timeav   = number of dumps to average in time
+     flag     = Run the SDP flagger on the data?
+     doweight = Read the weights in the katdal file? (else they will all be 1.0)
+     doflags  = read the flags from the katdal file?
+     quack    = number of dumps to 'quack' before each scan.
     """
     ################################################################
     reffreq =  meta["spw"][0][1]    # reference frequency
@@ -638,8 +650,9 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
                                       spike_width_freq=1.5e6/katdata.channel_width,
                                       spike_width_time=100./katdata.dump_period,
                                       time_extend=3, freq_extend=3, average_freq=1)
-    #Set up the baseline mask
-    blmask = get_baseline_mask(newants, katdata.corr_products, blmask)
+    #Set up thestatic flags
+    if static is not None:
+        static_flags = get_static_flags(katdata, blmask, static)
 
     # Template vis
     vis = outUV.ReadVis(err, firstVis=1)
@@ -657,24 +670,24 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
                                 for antenna in newants])
 
     max_scan = 151
-    QUACK = 1
+    quack = quack
     # Generate arrays for storage
     scan_vs = numpy.empty((max_scan, nchan, nprod), dtype=katdata.vis.dtype)
     scan_fg = numpy.empty((max_scan, nchan, nprod), dtype=katdata.flags.dtype)
     scan_wt = numpy.empty((max_scan, nchan, nprod), dtype=katdata.weights.dtype)
     for scan, state, target in katdata.scans():
         # Don't read at all if all will be "Quacked"
-        if katdata.shape[0] < ((QUACK + 1) * timeav):
+        if katdata.shape[0] < ((quack + 1) * timeav):
             continue
         # Chunk data into max_scan dumps
         if katdata.shape[0] > max_scan:
-            scan_slices = [slice(i, i + max_scan, 1) for i in range(QUACK * timeav, katdata.shape[0], max_scan)]
+            scan_slices = [slice(i, i + max_scan, 1) for i in range(quack * timeav, katdata.shape[0], max_scan)]
             scan_slices[-1] = slice(scan_slices[-1].start, katdata.shape[0], 1)
         else:
-            scan_slices = [slice(QUACK * timeav, katdata.shape[0])]
+            scan_slices = [slice(quack * timeav, katdata.shape[0])]
 
         # Number of integrations
-        num_ints = katdata.timestamps.shape[0] - QUACK * timeav
+        num_ints = katdata.timestamps.shape[0] - quack * timeav
         msg = "Scan:%4d Int: %4d %16s Start %s"%(scan, num_ints, target.name,
                                                  day2dhms((katdata.timestamps[0] - time0) / 86400.0)[0:12])
         OErr.PLog(err, OErr.Info, msg);
@@ -689,13 +702,13 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
             if doweight==False:
                 wt[:] = 1.
             vs = scan_vs[:nint]
-            if visphase_corr is not None:#applies if antphasedict if supplied
+            if visphase_corr is not None: # applies if antphasedict if supplied
                 vs *= visphase_corr[numpy.newaxis, :]
             fg = scan_fg[:nint]
             if doflags==False:
                 fg[:] = False
             if static is not None:
-                fg[:, :, blmask] |= static[numpy.newaxis, :, numpy.newaxis]
+                fg |= static_flags[numpy.newaxis, :]
             if flag:
                 fg |= flag_data(vs, fg, flagger)
             if timeav>1:
@@ -909,20 +922,20 @@ def fill_buffer(in_vis, in_flags, in_weights, in_rparm, cp_index, bls_index, out
                     out_buffer[buff_idx + 2] = weight
     return out_buffer
 
-def get_baseline_mask(ants, corr_prods, limit):
+def get_static_flags(katdata, limit, static):
     """
-    Compute a mask of the same shape as corr_products that indicates
+    Compute a mask of the same shape as katdata.corr_products that indicates
     whether the basline length of the given correlation product is
     shorter than limit in meters
     """
-    baseline_mask = numpy.zeros(corr_prods.shape[0], dtype=numpy.bool)
+    static_flags = numpy.zeros(katdata.shape[1:], dtype = katdata.flags.dtype)
     antlookup = {}
-    for ant in ants:
+    for ant in katdata.ants:
         antlookup[ant.name] = ant
-    for prod, baseline in enumerate(corr_prods):
+    for prod, baseline in enumerate(katdata.corr_products):
         bl_vector = antlookup[baseline[0][:4]].baseline_toward(antlookup[baseline[1][:4]])
         bl_length = numpy.linalg.norm(bl_vector)
         if bl_length < limit:
-            baseline_mask[prod] = True
-    return baseline_mask
+            static_flags[:, prod] = static
+    return static_flags
 

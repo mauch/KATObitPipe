@@ -79,14 +79,13 @@ def KATInitContParms():
     parms["doClearGain"]  = True        # Clear SN and CL tables >1
     parms["doClearFlag"]  = True        # Clear FG tables > 1
     parms["doClearBP"]    = True        # Clear BP tables?
-    parms["doQuack"]      = True        # Quack data?
-    parms["doBadAnt"]     = False        # Check for bad antennas?
+    parms["quack"]        = 1           # Number of dumps to 'quack'
+    parms["doBadAnt"]     = False       # Check for bad antennas?
     parms["doInitFlag"]   = True        # Initial broad Frequency and time domain flagging
     parms["doChopBand"]   = True        # Cut the bandpass from lowest to highest channel after special editing.
     parms["editList"]     = []          # List of dictionaries    
     parms["quackBegDrop"] = 7.5/60.0    # Time to drop from start of each scan in min
     parms["quackEndDrop"] = 0./60.0         # Time to drop from end of each scan in min
-    parms["quackReason"]  = "Quack"     # Reason string
     parms["begChanFrac"]  = 0.035        # Fraction of beginning channels to drop
     parms["endChanFrac"]  = 0.035        # Fraction of end channels to drop
     parms["doShad"]       = True        # Shadow flagging (config dependent)
