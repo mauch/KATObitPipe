@@ -136,7 +136,6 @@ def MKContPipeline(files, outputdir, **kwargs):
         print("parmFile",kwargs.get('parmFile'))
         exec(open(kwargs.get('parmFile')).read())
         EVLAAddOutFile(os.path.basename(kwargs.get('parmFile')), 'project', 'Pipeline input parameters')
-
     ###################### Data selection and static edits ############################################
     # Select data based on static imageable parameters
     KATh5Select(katdata, parms, err, **kwargs)
@@ -180,7 +179,10 @@ def MKContPipeline(files, outputdir, **kwargs):
         printMess(mess, logFile)
         KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
         uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), data_class, disk, data_seq, err)
-        obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
+        obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err,
+                                       calInt=katdata.dump_period, static=sflags,
+                                       antphase_adjust_filename=parms.get('antphase_adjust_filename', None),
+                                       quack=parms.get('quack', 1), **kwargs)
         MakeIFs.UVMakeIF(uv,8,err,solInt=katdata.dump_period)
         os.remove(outtemplate)
     delay_exists = False
@@ -194,7 +196,10 @@ def MKContPipeline(files, outputdir, **kwargs):
             # Load the delay cal observation
             KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
             delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delay_class, disk, seq, err)
-            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
+            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err,
+                                 calInt=katdata.dump_period, static=sflags,
+                                 flag=False, antphase_adjust_filename=parms.get('antphase_adjust_filename', None),
+                                 quack=parms.get('quack', 1))
             MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
             os.remove(outtemplate)
     

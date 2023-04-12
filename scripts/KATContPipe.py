@@ -13,6 +13,7 @@ parser.add_option("--targets", help="List of targets to load (You'll need calibr
 parser.add_option("--config", dest='configFile', help="Location of .katimrc configuration file.")
 parser.add_option("--timeav", default=1, help="Dumber of dumps to average when making uvfits file")
 parser.add_option("--flags", default=None, help="External flags to add")
+parser.add_option("--antphase-adjust-filename", default=None, help="string or None\nfilename to numpy .npz file containing phase adjustment per input per channel\nto be applied to all raw visibilities before further processing.")
 (options, katfilenames) = parser.parse_args()
 
 if len(katfilenames) == 0:
@@ -20,7 +21,7 @@ if len(katfilenames) == 0:
     sys.exit()
 
 kwargs = {}
-for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flags']:
+for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flags', 'antphase_adjust_filename']:
 	if getattr(options,k) != None:
 		kwargs[k] =  getattr(options,k)
 try:

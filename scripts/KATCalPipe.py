@@ -32,6 +32,7 @@ parser.add_option("--delaycal_mvf", default=None, type='str', help='Dataset to u
 									'This option is only used when --polcal is selected.')
 parser.add_option("--katdal_timeout", default=300, type='int', help='Timeout (in seconds) for data read in katdal')
 parser.add_option("--katdal_retries", default=2, type='int', help='Number of retries for data read in katdal')
+parser.add_option("--antphase-adjust-filename", default=None, help="string or None\nfilename to numpy .npz file containing phase adjustment per input per channel\nto be applied to all raw visibilities before further processing.")
 (options, katfilenames) = parser.parse_args()
 
 if len(katfilenames) == 0:
@@ -39,7 +40,7 @@ if len(katfilenames) == 0:
     sys.exit()
 
 kwargs = {}
-for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'polcal', 'XYtarg', 'delaycal_mvf', 'katdal_timeout', 'katdal_retries']:
+for k in ['parmFile', 'scratchdir', 'targets', 'configFile', 'timeav', 'flag', 'reuse', 'zapraw', 'aipsdisk', 'halfstokes', 'gzip', 'dropants', 'blmask', 'refant', 'katdal_refant', 'polcal', 'XYtarg', 'delaycal_mvf', 'katdal_timeout', 'katdal_retries', 'antphase_adjust_filename']:
 	if getattr(options,k) != None:
 		kwargs[k] =  getattr(options,k)
 try:
