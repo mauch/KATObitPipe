@@ -538,7 +538,7 @@ def StopFringes(visData,freqData,cable_delay):
     return outVisData
 
 
-def load_antphasedict(antphase_adjust_filename, katdata, err):
+def load_phase_correction(antphase_adjust_filename, katdata, err):
     """Blame mattieu@sarao.ska.ac.za"""
     if antphase_adjust_filename is None:
         return None
@@ -575,10 +575,11 @@ def load_antphasedict(antphase_adjust_filename, katdata, err):
         OErr.printErr(err)
         print(msg)
         return None
-    antphasedict_exp={}
-    for key,value in antphasedict_rad.items():
-        antphasedict_exp[key]=numpy.exp(1j*value)
-    return antphasedict_exp
+    phase_corr = numpy.zeros(katdata.shape[1:], dtype=katdata.vis.dtype)
+    for iprod,(input0,input1) in enumerate(katdata.corr_products):
+        phase_corr[:,iprod]=numpy.exp(antphasedict_rad[input0][katdata.channels] -
+                                      antphasedict_rad[input1][katdata.channels])
+    return phase_corr
 
 
 def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphase_adjust_filename=None, timeav=1, flag=False, doweight=True, doflags=True):
@@ -648,7 +649,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
     numvis = 0
     
     #load per-antenna,per-channel phase adjustment, if any, from file to apply to visibilities later
-    antphasedict_exp=load_antphasedict(antphase_adjust_filename, katdata, err)
+    visphase_corr=load_phase_correction(antphase_adjust_filename, katdata, err)
     
     # Set up baseline vectors of uvw calculation
     array_centre = katpoint.Antenna('', *newants[0].ref_position_wgs84)
@@ -688,10 +689,8 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
             if doweight==False:
                 wt[:] = 1.
             vs = scan_vs[:nint]
-            if antphasedict_exp is not None:#applies if antphasedict if supplied
-                for iprod,(input0,input1) in enumerate(katdata.corr_products):
-                    expadj=antphasedict_exp[input0][katdata.channels]/antphasedict_exp[input1][katdata.channels]
-                    vs[:,:,iprod]=vs[:,:,iprod]*expadj[numpy.newaxis,:]
+            if visphase_corr is not None:#applies if antphasedict if supplied
+                vs *= visphase_corr[numpy.newaxis, :]
             fg = scan_fg[:nint]
             if doflags==False:
                 fg[:] = False
