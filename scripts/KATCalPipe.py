@@ -121,7 +121,7 @@ def parse_python_assigns(assign_str):
 
 description = "Calibrate an MVF file."
 parser = ArgumentParser(description=description)
-parser.add_argument("katdata",
+parser.add_argument("katdata", nargs='+',
                     help="MVF file our URL to process")
 parser.add_argument("--outputdir", default='./',
                     help="Specify the output data directory.")
