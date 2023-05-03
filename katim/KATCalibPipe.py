@@ -27,8 +27,8 @@ def MKContPipeline(files, outputdir, **kwargs):
     Parameters
     ----------
     files : list
-        h5 filenames (note: support for multiple h5 files 
-        i.e. ConcatenatedDataSet is not currently supported)
+        MVF filenames (note: support for multiple MVF files 
+        i.e. ConcatenatedDataSet is not currently encouraged)
     outputdir : string
         Directory location to write output data, 
     scratchdir : string, optional
@@ -42,13 +42,13 @@ def MKContPipeline(files, outputdir, **kwargs):
         h5file = files
     ############### Initialize katfile object #########################
     OK = False
-    # Open the h5 file as a katfile object
+    # Open the MVF file as a katfile object
     try:
-        #open katfile and perform selection according to kwargs
-        katdal_ref_ant = kwargs.get('katdal_refant', '')
-        katdal_retries = kwargs.get('katdal_retries', 2)
-        katdal_timeout = kwargs.get('katdal_timeout', 300)
-        katdata = katfile.open(h5file, ref_ant=katdal_ref_ant, timeout=katdal_timeout, retries=katdal_retries)
+        #open katfile and add options according to kwargs
+        katdal_options = kwargs.get('katdal_options', {})
+        katdal_options.setdefault('retries', 2)
+        katdal_options.setdefault('timeout', 300)
+        katdata = katfile.open(h5file, **katdal_options)
         OK = True
     except Exception as exception:
         print(exception)
@@ -59,7 +59,8 @@ def MKContPipeline(files, outputdir, **kwargs):
     if kwargs.get('polcal'):
         if kwargs.get('delaycal_mvf') is None:
             # Automatically determine delay_cal CBID
-            delay_katdata = KATGetDelayCal(h5file, katdata, timeout=katdal_timeout, retries=katdal_retries)  
+            delay_katdata = KATGetDelayCal(h5file, katdata, timeout=katdal_options['timeout'],
+                                                            retries=katdal_options['retries'])  
         else:
             # Use the user supplied one
             delay_katdata = KATGetDelayCal(kwargs.get('delaycal_mvf'))
