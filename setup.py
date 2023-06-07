@@ -32,8 +32,8 @@ setup (
     install_requires=[
         "astropy",
         "katsdpsigproc",
-        "katdal @ git+https://github.com/ska-sa/katdal@spr1-1450-katpoint-1.0",
-        "katpoint == 1.0a1",
+        "katdal @ git+https://github.com/ska-sa/katdal@spr1-1493-astrometry-test3",
+        "katpoint == 1.0a2",
         "matplotlib",
         "numba",
         "numpy"]

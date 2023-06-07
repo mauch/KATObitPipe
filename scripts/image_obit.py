@@ -24,7 +24,6 @@ parser.add_option("--scratch",help="Location of aips disk to create")
 filebase=os.path.basename(os.path.splitext(args[0])[0])
 # Obit error logging
 err = OErr.OErr()
-OErr.PInit(err,2,'/dev/null')
 ObitSys = AIPSSetup.AIPSSetup(err,scratchdir=options.scratch)
 # Get the set up AIPS environment.
 AIPS_ROOT    = os.environ['AIPS_ROOT']
@@ -71,7 +70,7 @@ uv=OTObit.uvlod(args[0],0,nam,cls,disk,seq,err)
 # Initialize parameters dictionary
 ####### Initialize parameters dictionary ##### 
 parms = KATInitContParms()
-targets=options.targets or EVLAAllSource(uv,err,logfile=logFile,check=False,debug=False)
+targets=options.targets or EVLAAllSource(uv,err,check=False,debug=False)
 
 #BLavg?
 if options.blavg:
@@ -91,7 +90,9 @@ if options.blavg:
     blavg.outClass='BLAVG'
     blavg.outSeq=1
     blavg.outDisk=1
-    blavg.taskLog='IMAGE.log'
+    blavg.logFile=""
+    blavg.avgFreq=1
+    blavg.chAvg=2
     blavg.g
 
     uv=UV.newPAUV('BL IMAGE DATA','IMAGE','BLAVG',1,1,True,err)
@@ -116,8 +117,8 @@ KATImageTargets (uv, err, Sources=targets, seq=1, sclass="IClean", OutlierArea=p
                           do3D=parms["do3D"], BLFact=1., BLchAvg=parms["BLchAvg"], \
                           doMB=True, norder=parms["MBnorder"], maxFBW=parms["MBmaxFBW"], \
                           PBCor=parms["PBCor"],antSize=parms["antSize"], autoCen=parms["autoCen"], \
-                          nTaper=parms["nTaper"], Tapers=parms["Tapers"], sefd=1500, \
-                          nThreads=72, noScrat=[], logfile="IMAGE.log", check=False, debug=False)
+                          nTaper=parms["nTaper"], Tapers=parms["Tapers"], sefd=1500,\
+                          nThreads=72, noScrat=[], logfile="", check=False, debug=False)
 
 x = Image.newPAImage("out", targets, "IClean", disk, 1, True, err)
 xf = KATImFITS(x,targets+".fits", 0 , err, logfile="IMAGE.log")

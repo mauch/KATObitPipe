@@ -609,12 +609,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
         OErr.printErr(err)
         print(msg)
 
-    # Set up baseline vectors of uvw calculation
-    lon, lat, elev = newants[0].ref_position_wgs84
-    array_centre = katpoint.Antenna(f'poo, {lon}, {lat}, {elev}')#, *newants[0].ref_position_wgs84)
-    baseline_vectors = numpy.array([array_centre.baseline_toward(antenna)
-                                for antenna in newants])
-
     max_scan = 151
     QUACK = 1
     # Generate arrays for storage
@@ -669,15 +663,11 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, stop_w=
             numflags += numpy.sum(fg)
             numvis += fg.size
             # uvw calculation
-
-            #uvw_coordinates_old = get_uvw_coordinates(array_centre, baseline_vectors, tm, target, bi)
-            print("UVW")
             st = time.time()
             u = katdata.u[sl, uvw_indices]
             v = katdata.v[sl, uvw_indices]
             w = katdata.w[sl, uvw_indices]
             uvw_coordinates = numpy.stack((u, v, w), axis=-1)
-            print(time.time() - st)
             # Convert to aipsish
             uvw_coordinates /= lamb
 

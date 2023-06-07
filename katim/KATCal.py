@@ -233,9 +233,9 @@ def KATInitContParms():
     parms["outIClass"]   = "IClean"     # Output target final image class
     parms["Stokes"]      = "I"          # Stokes to image
     parms["Robust"]      = -1.5         # Weighting robust parameter
-    parms["FOV"]         = 1.0          # Field of view radius in deg.
+    parms["FOV"]         = 1.3          # Field of view radius in deg.
     parms["Niter"]       = 50000        # Max number of clean iterations
-    parms["minFlux"]     = 0.00008     # Minimum CLEAN flux density
+    parms["minFlux"]     = 0.0001     # Minimum CLEAN flux density
     parms["minSNR"]      = 4.0          # Minimum Allowed SNR
     parms["solPMode"]    = "P"          # Phase solution for phase self cal
     parms["solPType"]    = "    "       # Solution type for phase self cal
@@ -243,11 +243,11 @@ def KATInitContParms():
     parms["solAType"]    = "    "       # Solution type for A&P self cal
     parms["avgPol"]      = False         # Average poln in self cal?
     parms["avgIF"]       = False        # Average IF in self cal?
-    parms["maxPSCLoop"]  = 0            # Max. number of phase self cal loops
-    parms["minFluxPSC"]  = 0.00008         # Min flux density peak for phase self cal
+    parms["maxPSCLoop"]  = 2            # Max. number of phase self cal loops
+    parms["minFluxPSC"]  = 0.001         # Min flux density peak for phase self cal
     parms["solPInt"]     = 0.5          # phase self cal solution interval (min)
     parms["maxASCLoop"]  = 0            # Max. number of Amp+phase self cal loops
-    parms["minFluxASC"]  = 0.0001        # Min flux density peak for amp+phase self cal
+    parms["minFluxASC"]  = 0.01        # Min flux density peak for amp+phase self cal
     parms["solAInt"]     = 1.0           # amp+phase self cal solution interval (min)
     parms["nTaper"]      = 0            # Number of additional imaging multiresolution tapers
     parms["Tapers"]      = [0.0]        # List of tapers in pixels
@@ -5435,12 +5435,13 @@ def KATImageTargets(uv, err, Sources=None,  FreqID=1, seq=1, sclass="IClean", ba
     imager.minPatch    = minPatch
     imager.OutlierSize = OutlierSize
     imager.doGPU       = True
+    imager.doGPUGrid   = True
     if doOutlier or ((doOutlier==None) and refFreq<6.0e9):
         imager.OutlierDist = FOV*OutlierArea   # Outliers from NVSS/SUMMS for lower frequencies
         if refFreq>1.0e9:
-            imager.OutlierFlux = 0.002
+            imager.OutlierFlux = 0.001
         else:
-            imager.OutlierFlux = 0.002
+            imager.OutlierFlux = 0.001
     # Auto window or centered box
     if CleanRad:
         imager.CLEANBox=[-1,CleanRad,0,0]
@@ -5453,7 +5454,7 @@ def KATImageTargets(uv, err, Sources=None,  FreqID=1, seq=1, sclass="IClean", ba
     imager.doComRes = True
     imager.noScrat     = noScrat
     imager.nThreads    = nThreads
-    imager.prtLv = 5
+    imager.prtLv = 2
     if debug:
         imager.prtLv = 5
         imager.i
