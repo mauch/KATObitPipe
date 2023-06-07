@@ -27,8 +27,8 @@ def MKContPipeline(files, outputdir, **kwargs):
     Parameters
     ----------
     files : list
-        h5 filenames (note: support for multiple h5 files 
-        i.e. ConcatenatedDataSet is not currently supported)
+        MVF filenames (note: support for multiple MVF files 
+        i.e. ConcatenatedDataSet is not currently encouraged)
     outputdir : string
         Directory location to write output data, 
     scratchdir : string, optional
@@ -42,13 +42,13 @@ def MKContPipeline(files, outputdir, **kwargs):
         h5file = files
     ############### Initialize katfile object #########################
     OK = False
-    # Open the h5 file as a katfile object
+    # Open the MVF file as a katfile object
     try:
-        #open katfile and perform selection according to kwargs
-        katdal_ref_ant = kwargs.get('katdal_refant', '')
-        katdal_retries = kwargs.get('katdal_retries', 2)
-        katdal_timeout = kwargs.get('katdal_timeout', 300)
-        katdata = katfile.open(h5file, ref_ant=katdal_ref_ant, timeout=katdal_timeout, retries=katdal_retries, applycal='l0.KRETRACK')
+        #open katfile and add options according to kwargs
+        katdal_options = kwargs.get('katdal_options', {})
+        katdal_options.setdefault('retries', 2)
+        katdal_options.setdefault('timeout', 300)
+        katdata = katfile.open(h5file, **katdal_options)
         OK = True
     except Exception as exception:
         print(exception)
@@ -59,7 +59,8 @@ def MKContPipeline(files, outputdir, **kwargs):
     if kwargs.get('polcal'):
         if kwargs.get('delaycal_mvf') is None:
             # Automatically determine delay_cal CBID
-            delay_katdata = KATGetDelayCal(h5file, katdata, timeout=katdal_timeout, retries=katdal_retries)  
+            delay_katdata = KATGetDelayCal(h5file, katdata, timeout=katdal_options['timeout'],
+                                                            retries=katdal_options['retries'])  
         else:
             # Use the user supplied one
             delay_katdata = KATGetDelayCal(kwargs.get('delaycal_mvf'))
@@ -136,7 +137,6 @@ def MKContPipeline(files, outputdir, **kwargs):
         print("parmFile",kwargs.get('parmFile'))
         exec(open(kwargs.get('parmFile')).read())
         EVLAAddOutFile(os.path.basename(kwargs.get('parmFile')), 'project', 'Pipeline input parameters')
-
     ###################### Data selection and static edits ############################################
     # Select data based on static imageable parameters
     KATh5Select(katdata, parms, err, **kwargs)
@@ -180,7 +180,10 @@ def MKContPipeline(files, outputdir, **kwargs):
         printMess(mess, logFile)
         KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
         uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), data_class, disk, data_seq, err)
-        obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, **kwargs)
+        obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err,
+                                       calInt=katdata.dump_period, static=sflags,
+                                       antphase_adjust_filename=parms.get('antphase_adjust_filename', None),
+                                       quack=parms.get('quack', 1), **kwargs)
         MakeIFs.UVMakeIF(uv,8,err,solInt=katdata.dump_period)
         os.remove(outtemplate)
     delay_exists = False
@@ -194,10 +197,13 @@ def MKContPipeline(files, outputdir, **kwargs):
             # Load the delay cal observation
             KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
             delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delay_class, disk, seq, err)
-            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err, calInt=katdata.dump_period, static=sflags, flag=False)
+            KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err,
+                                 calInt=katdata.dump_period, static=sflags,
+                                 flag=False, antphase_adjust_filename=parms.get('antphase_adjust_filename', None),
+                                 quack=parms.get('quack', 1))
             MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
             os.remove(outtemplate)
-    
+
     # Print the uv data header to screen.
     uv.Header(err)
     ############################# Set Project Processing parameters ###################################
@@ -247,7 +253,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         targets = [targ.name for targ in katdata.catalogue if (targ.name not in clist) and (targ.name in kwargs.get('targets').split(','))]
     else:
         targets = [targ.name for targ in katdata.catalogue if (targ.name not in clist)]
-    
+
     refAnt = kwargs.get('refant')
     if refAnt is not None:
         try:
@@ -301,7 +307,7 @@ def MKContPipeline(files, outputdir, **kwargs):
                               logfile=logFile, check=check, debug=debug)
         if retCode!=0:
             raise RuntimeError("Error Shadow flagging data")
-    
+
     # Median window time editing, for RFI impulsive in time
     if parms["doMednTD1"]:
         mess =  "Median window time editing, for RFI impulsive in time:"
@@ -312,7 +318,7 @@ def MKContPipeline(files, outputdir, **kwargs):
                                   logfile=logFile, check=check, debug=False)
         if retCode!=0:
             raise RuntimeError("Error in MednFlag")
-    
+
     # Median window frequency editing, for RFI impulsive in frequency
     if parms["doFD1"]:
         mess =  "Median window frequency editing, for RFI impulsive in frequency:"
@@ -325,14 +331,14 @@ def MKContPipeline(files, outputdir, **kwargs):
                                 nThreads=nThreads, logfile=logFile, check=check, debug=debug)
         if retCode!=0:
            raise  RuntimeError("Error in AutoFlag")
-    
+
     # Parallactic angle correction?
     if parms["doPACor"]:
         retCode = EVLAPACor(uv, err, \
                                 logfile=logFile, check=check, debug=debug)
         if retCode!=0:
             raise RuntimeError("Error in Parallactic angle correction")
-    
+
     # Need to find a reference antenna?  See if we have saved it?
     if (parms["refAnt"]<=0):
         refAnt = FetchObject(fileRoot+".refAnt.pickle")
@@ -370,7 +376,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         if retCode!=0:
             raise  RuntimeError("Error in Plotting spectrum")
         EVLAAddOutFile(plotFile, 'project', 'Pipeline log file' )
-    
+
     if parms["PolCal"]:
         mess = "XYphase bandpass calibration"
         printMess(mess, logFile)
@@ -428,7 +434,6 @@ def MKContPipeline(files, outputdir, **kwargs):
                                    check=check, debug=debug, logfile=logFile )
             if retCode!=0:
                 raise  RuntimeError("Error in Plotting spectrum")
-    
 
     # Amp & phase Calibrate
     if parms["doAmpPhaseCal"]:
@@ -547,7 +552,7 @@ def MKContPipeline(files, outputdir, **kwargs):
                             nThreads=nThreads, logfile=logFile, check=check, debug=debug)
             if retCode!=0:
                 raise RuntimeError("Error in Bandpass calibration")
-        
+
             # Plot corrected data?
             if parms["doSpecPlot"] and parms["plotSource"]:
                 plotFile = fileRoot+"_BPSpec2.ps"
@@ -618,7 +623,7 @@ def MKContPipeline(files, outputdir, **kwargs):
     #Zap unaveraged data if requested
     if kwargs.get('zapraw'):
         uv.Zap(err)
-    
+
     # Get calibrated/averaged data
     if not check:
         uv = UV.newPAUV("AIPS UV DATA", EVLAAIPSName(project), avgClass[0:6], \
@@ -649,5 +654,3 @@ class DataProductError(Exception):
 class TooManyKatfilesException(Exception):
     """ Exception in KATPipe. """
     pass
-
-

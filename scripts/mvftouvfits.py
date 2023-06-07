@@ -67,7 +67,7 @@ uv=OTObit.uvlod(filebase+'.uvfits',0,nam,cls,disk,seq,err)
 
 os.remove(filebase+'.uvfits')
 
-obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=1.0, stop_w=False, doflags=options.write_flags)
+obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err, calInt=1.0, doflags=options.write_flags)
 
 uv.Header(err)
 if not options.leave_aips:
