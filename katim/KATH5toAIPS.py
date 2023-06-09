@@ -663,10 +663,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
     numvis = 0
     #load per-antenna,per-channel phase adjustment, if any, from file to apply to visibilities later
     visphase_corr=load_phase_correction(antphase_adjust_filename, katdata, err)
-    # Set up baseline vectors of uvw calculation
-    array_centre = katpoint.Antenna('', *newants[0].ref_position_wgs84)
-    baseline_vectors = numpy.array([array_centre.baseline_toward(antenna)
-                                for antenna in newants])
 
     max_scan = 151
     quack = quack
@@ -724,7 +720,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
             numflags += numpy.sum(fg)
             numvis += fg.size
             # uvw calculation
-            st = time.time()
             u = katdata.u[sl, uvw_indices]
             v = katdata.v[sl, uvw_indices]
             w = katdata.w[sl, uvw_indices]
