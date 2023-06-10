@@ -58,11 +58,27 @@ import dask.array as da
 import numba
 from katsdpsigproc.rfi.twodflag import SumThresholdFlagger
 from textwrap import TextWrapper
+from .KATImExceptions import KATUnimageableError
 
 """ TextWrapper for wrapping AIPS history text to 70 chars """
 _history_wrapper = TextWrapper(width=70, initial_indent='',
                                subsequent_indent='  ',
                                break_long_words=True)
+
+CORR_ID_MAP = {('h', 'h'): 0,
+               ('v', 'v'): 1,
+               ('h', 'v'): 2,
+               ('v', 'h'): 3}
+
+def getmaxstokes(katdata):
+    dpmax = -1
+    for idx, d in enumerate(katdata.corr_products):
+        p1 = d[0][-1:].lower()
+        p2 = d[1][-1:].lower()
+        dpmax = max(dpmax, CORR_ID_MAP[(p1, p2)])
+    # AIPS Stokes index is Fortran.
+    dpmax = dpmax + 1
+    return dpmax
 
 def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
               calInt=1.0, static=None, antphase_adjust_filename=None, \
@@ -100,10 +116,6 @@ def KAT2AIPS (katdata, outUV, disk, fitsdisk, err, \
 
     # Extract metadata
     meta = GetKATMeta(katdata, err)
-
-    # TODO: Fix this all up so that the below isn't the case!
-    if meta["products"].size != meta["nants"] * meta["nants"] * 4:
-        raise ValueError("Only full stokes and all correlation products are supported.")
 
     # Extract AIPS parameters of the uv data to the metadata
     meta["Aproject"] = outUV.Aname
@@ -256,21 +268,20 @@ def GetKATMeta(katdata, err):
     out["antLookup"] = alook
     out["maxant"] = max([alook[i] for i in alook])
     # Data products
-    nstokes = 4
+    nstokes = getmaxstokes(katdata) 
+    if not nstokes in [2, 4]:
+        msg = f'Only HH,VV (Half pol) or HH,VV,HV,VH (Full pol) datasets can be processed.'
+        OErr.printErrMsg(err, msg)
+        raise KATUnimageableError(msg)
     #Set up array linking corr products to indices
     dl = numpy.empty((out["nants"], out["nants"], nstokes), dtype=numpy.int)
     bl = []
     for idx, d in enumerate(katdata.corr_products):
-        a1 = antnums.index(alook[d[0][:4]])
-        a2 = antnums.index(alook[d[1][:4]])
-        if d[0][4:]=='h' and d[1][4:]=='h':
-            dp = 0
-        elif d[0][4:]=='v' and d[1][4:]=='v':
-            dp = 1
-        elif d[0][4:]=='h' and d[1][4:]=='v':
-            dp = 2
-        else:
-            dp = 3
+        a1 = antnums.index(alook[d[0][:-1]])
+        a2 = antnums.index(alook[d[1][:-1]])
+        p1 = d[0][-1:].lower()
+        p2 = d[1][-1:].lower()
+        dp = CORR_ID_MAP[(p1, p2)]
         dl[a1, a2, dp] = idx
         #Fill the matrix with the inverse baselines
         dl[a2, a1, dp] = idx
@@ -291,7 +302,7 @@ def GetKATMeta(katdata, err):
     # Correlator mode (assuming 1 spectral window KAT-7)
     out["corrmode"] = katdata.spectral_windows[0].product
     # Central frequency (in Hz)
-    out["centerfreq"] = katdata.channel_freqs[numchan //2]
+    out["centerfreq"] = katdata.channel_freqs[numchan // 2]
     # Expose all KAT-METADATA to calling script
     out["katdata"] = katdata
     out["RX"] = katdata.spectral_windows[katdata.spw].band
@@ -724,7 +735,7 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
 
             numflags += numpy.sum(fg)
             numvis += fg.size
-
+            print(numflags, numvis, fg.shape)
             # uvw calculation
             uvw_coordinates = get_uvw_coordinates(array_centre, baseline_vectors, tm, target, bi)
 
@@ -762,12 +773,15 @@ def MakeTemplate(inuv, outuv, katdata):
     Construct a template file with the correct channel range and write it to outuv.
     """
     numchans = len(katdata.channel_freqs)
+    numstokes = getmaxstokes(katdata)
     nvispio = len(numpy.unique([(cp[0][:-1] + cp[1][:-1]).upper() for cp in katdata.corr_products]))
     uvfits = pyfits.open(inuv)
     #Resize the visibility table
     vistable = uvfits[1].columns
     vistable.del_col('VISIBILITIES')
-    newvis = pyfits.Column(name='VISIBILITIES',format='%dE'%(3*4*numchans),dim='(3,4,%d,1,1,1)'%(numchans,),array=numpy.zeros((nvispio,1,1,1,numchans,4,3,),dtype=numpy.float32))
+    newvis = pyfits.Column(name='VISIBILITIES', format='%dE'%(3*numstokes*numchans),
+                           dim='(3,%d,%d,1,1,1)'%(numstokes,numchans,),
+                           array=numpy.zeros((nvispio,1,1,1,numchans,numstokes,3,), dtype=numpy.float32))
     vistable.add_col(newvis)
     vishdu = pyfits.BinTableHDU.from_columns(vistable)
     for key in list(uvfits[1].header.keys()):

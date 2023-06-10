@@ -481,7 +481,13 @@ def KATh5Select(katdata, parms, err, **kwargs):
     """
     #User defined targets
     if kwargs.get('targets'):
-        katdata.select(targets=kwargs.get('targets').split(','))
+        targs = kwargs.get('targets').split(',')
+        for i, _ in enumerate(targs):
+            try:
+                targs[i] = int(targs[i])
+            except ValueError:
+                pass
+        katdata.select(targets=targs)
 
     file_ants = [ant.name for ant in katdata.ants]
     if kwargs.get('dropants'):
@@ -538,12 +544,6 @@ def KATh5Select(katdata, parms, err, **kwargs):
         included_allcals = included_allcals[0:30]
     katdata.select(targets=included_allcals+included_targets, reset='')
 
-    # Only select 1 spectral window
-    if len(katdata.spectral_windows) > 1:
-        OErr.PLog(err, OErr.Info, "The file contains more than one spectral window.\n Will only image the first.")
-        OErr.printErr(err)
-        #First spectral window is selected by default.
-
     channel_range=kwargs.get('channel_range')
     nchan=katdata.shape[1]
     if channel_range:
@@ -579,11 +579,18 @@ def KATh5Select(katdata, parms, err, **kwargs):
         raise RuntimeError("Requested channel range outside data set boundaries. Set channels in the range [0,%s]" % (katdata.shape[1]-1,))
     chan_range = slice(first_chan, last_chan + 1)
 
-    msg = "\nChannel range %s through %s." % (first_chan, last_chan)
+    msg = "Channel range %s through %s." % (first_chan, last_chan)
     OErr.PLog(err, OErr.Info, msg)
     OErr.printErr(err)
     print(msg)
     katdata.select(channels=chan_range)
+
+    if kwargs.get('halfstokes'):
+        katdata.select(pol='H,V', reset='')
+        msg = "Reading HH,VV polarisation products only."
+        OErr.PLog(err, OErr.Info, msg)
+        OErr.printErr(err)
+        print(msg)
 
     # More than 4 antennas
     if len(katdata.ants) < 4:
