@@ -735,7 +735,6 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
 
             numflags += numpy.sum(fg)
             numvis += fg.size
-            print(numflags, numvis, fg.shape)
             # uvw calculation
             uvw_coordinates = get_uvw_coordinates(array_centre, baseline_vectors, tm, target, bi)
 
