@@ -159,6 +159,9 @@ def MKContPipeline(files, outputdir, **kwargs):
     # Construct a template uvfits file from master template
     mastertemplate = ObitTalkUtil.FITSDir.FITSdisks[fitsdisk] + 'MKATTemplate.uvtab.gz'
     outtemplate = nam + '.uvtemp'
+    # For CL Table in min
+    solint = (katdata.dump_period * 4) / 60.
+
     # Reuse or nay?
     if kwargs.get('reuse'):
         exists = UV.AExist(EVLAAIPSName(project), data_class, disk, data_seq, err)
@@ -181,10 +184,10 @@ def MKContPipeline(files, outputdir, **kwargs):
         KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
         uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), data_class, disk, data_seq, err)
         obsdata = KATH5toAIPS.KAT2AIPS(katdata, uv, disk, fitsdisk, err,
-                                       calInt=katdata.dump_period, static=sflags,
+                                       calInt=solint, static=sflags,
                                        antphase_adjust_filename=parms.get('antphase_adjust_filename', None),
                                        quack=parms.get('quack', 1), **kwargs)
-        MakeIFs.UVMakeIF(uv,8,err,solInt=katdata.dump_period)
+        MakeIFs.UVMakeIF(uv,8,err,solInt=solint)
         os.remove(outtemplate)
     delay_exists = False
     if parms["PolCal"]:
@@ -198,10 +201,10 @@ def MKContPipeline(files, outputdir, **kwargs):
             KATH5toAIPS.MakeTemplate(mastertemplate, outtemplate, katdata)
             delay_uv = OTObit.uvlod(outtemplate, 0, EVLAAIPSName(project), delay_class, disk, seq, err)
             KATH5toAIPS.KAT2AIPS(delay_katdata, delay_uv, disk, fitsdisk, err,
-                                 calInt=katdata.dump_period, static=sflags,
+                                 calInt=solint, static=sflags,
                                  flag=False, antphase_adjust_filename=parms.get('antphase_adjust_filename', None),
                                  quack=parms.get('quack', 1))
-            MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=katdata.dump_period)
+            MakeIFs.UVMakeIF(delay_uv, 8, err, solInt=solint)
             os.remove(outtemplate)
 
     # Print the uv data header to screen.
