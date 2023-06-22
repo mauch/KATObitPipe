@@ -25,7 +25,7 @@ Run the Calibration Pipeline
 
 Once the Obit environment is setup, usually using `source setup.sh` with `setup.sh` containing environment variables pointing to the appropriate location of the Obit installation (see [setup.sh](/setup.sh) for an example). KATObitPipe should be installed as above. After this you can run the calibration script from anywhere.
 
-You will need disk space in the current working directory where you run the script to store the data as it is copied over from the archive, a typical 8 hour, 4096 channel, 8s dump observation will require approx 1.5 TB of disk space for processing.
+You will need disk space in the current working directory when you run the script in order to store the data as it is copied over from the archive. A typical 8 hour, 4096 channel, 8s dump observation will require approx 1.5 TB of disk space for processing.
 
 In your desired run location you run the calibration script with:
 
