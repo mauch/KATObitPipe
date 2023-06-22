@@ -109,51 +109,59 @@ Just a quick explanation of the options to docker run:
 Installing Obit binary distribution on the SARAO comXX machines
 ---------------------------------------------------------------
 
-1. Download and untar the desired binary package (r648 in the example below). Available Obit binary distributions can be found at https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/:
+1. Make a working directory for your Obit installation and work from there eg:
+```
+	$ mkdir ~/Obit
+	$ cd ~/Obit
+```
+
+2. Download and untar the desired binary package (r648 in the example below). Available Obit binary distributions can be found at https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/:
 ```
 	$ export OBIT_URL=https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/
 	$ curl ${OBIT_URL}/Obit.AVX-1.1.648.tar.gz | tar xzf -
 ```
 
-2. Download KATObitPipe:
+3. Download KATObitPipe:
 ```
 	$ git clone https://github.com/mauch/KATObitPipe
 ```
 
-3. Copy the setup.sh Obit script to the current dir:
+4. Copy the setup.sh Obit script to the base Obit install dir (`~/Obit` in this example):
 ```
-	$ cp KATObitPipe/setup.sh .
+	$ cp KATObitPipe/setup.sh ~/Obit
 ```
 
-4. Modify the first line of setup.sh so that OBIT_ROOT points to the dir you have put the Obit distro - In this example:
+5. Modify the first line of setup.sh so that OBIT_ROOT points to the dir you have put the Obit distro - In this example:
 ```
 	$ export OBIT_ROOT=/home/tmauch/Obit/obit-distro-1.1.648
 ```
 
-5. Source the Obit setup script:
+6. Source the Obit setup script:
 ```
 	$ source setup.sh
 ```
 
-6. Copy the static metadata from KATObitPipe distro into Obit, unzip the models, and chmod them to 777 (otherwise Obit can’t see them):
+7. Copy the static metadata from KATObitPipe distro into Obit, unzip the models, and chmod them to 777 (otherwise Obit can’t see them):
 ```
 	$ cp ./KATObitPipe/FITS/* ${OBIT_ROOT}/share/obit/data
 	$ gunzip ${OBIT_ROOT}/share/obit/data/*.fits.gz
-	$ chmod -R 777 ${OBIT_ROOT}/share/obit/data/*.fits.gz
+	$ chmod -R 777 ${OBIT_ROOT}/share/obit/data/*.fits
 ```
 
-7. Copy the Obit static metadata dir to the place KATObitPipe sees it by default:
+8. Copy the Obit static metadata dir to the place KATObitPipe sees it by default:
 ```
 	$ mkdir ${OBIT}/share
 	$ mv ${OBIT_ROOT}/share/obit/data ${OBIT}/share
 ```
 
-8. Remove the `libgfortran` from the Obit binaries and use the system installed one instead. (The version this that ships with Obit causes the AIPS tasks download on-the-fly by KATObitPipe to crash - so use the system `libgfortran` instead. This assumes `libgfortran` is installed on your system - in debian based linux use `apt install libgfortran` or something similar).
+9. Remove the `libgfortran` from the Obit binaries and use the system installed one instead.
+
+   The version that ships with binary Obit distributions causes the AIPS tasks downloaded on-the-fly by KATObitPipe to crash. It is best to use the system `libgfortran` instead. This assumes `libgfortran` is installed on your system. In Debian based Linux use `apt install libgfortran` or something similar.
 ```
 	$ rm -rf ${OBIT_ROOT}/lib/libgfortran*
 ```
 
-8. Install KATObitPipe:
+10. Install KATObitPipe:
 ```
 	$ pip install KATObitPipe
 ```
