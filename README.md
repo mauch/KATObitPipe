@@ -35,7 +35,7 @@ will list them and describe what they do.
 A typical example of a run on the observation with CBID=1592263862 stored in a file downloads from the archive and renamed to `1592263862_sdp_l0.full.rdb` is:
 
 ```
-	KATCalPipe.py --flag --gzip --polcal 1592263862_sdp_l0.full.rdb
+	$ KATCalPipe.py --flag --gzip --polcal 1592263862_sdp_l0.full.rdb
 ```
 This will run the calibration pipeline, re-flag the data (ie. throw away all the cal_rfi flags and recompute them on the fly), gzip the output UV table file and run in `polcal` mode, which means downloading the associated delaycal observation and perfoeming XY-Phase calibration on it before doing the full calibration on the average of the H&V polarisations.
 
@@ -72,21 +72,21 @@ You can build and run a Docker image with the appropriate Obit and `KATObitPipe`
 
 1. Get the latest `KATObitPipe` from github:
 ```
-	git clone https://www.github.com/mauch/KATObitPipe
+	$ git clone https://www.github.com/mauch/KATObitPipe
 ```
 
 2. Change directory into the repo
 ```
-	cd KATObitPipe
+	$ cd KATObitPipe
 ```
 4. Build the docker image (you will find out if your docker installation is working at this point)
 ```
-	docker build -t katobitpipe .
+	$ docker build -t katobitpipe .
 ```
 
 5. To RUN the script in the docker image cd to where you want to run (where your .rdb file and parameter file is) - you must have write permission here (obviously). Then the command is:
 ```   
-	docker run -t --rm -v ${PWD}:/scratch -e LOCAL_USER_ID=$(id -u) -e LOCAL_GROUP_ID=$(id -g) katobitpipe KATCalPipe.py <RDB URL> <OPTIONS>
+	$ docker run -t --rm -v ${PWD}:/scratch -e LOCAL_USER_ID=$(id -u) -e LOCAL_GROUP_ID=$(id -g) katobitpipe KATCalPipe.py <RDB URL> <OPTIONS>
 ```
 
 Just a quick explanation of the options to docker run:
@@ -104,49 +104,49 @@ Installing Obit binary distribution on the SARAO comXX machines
 
 1. Download and untar the desired binary package (r648 in the example below). Available Obit binary distributions can be found at https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/:
 ```
-	export  OBIT_URL=https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/
-	curl ${OBIT_URL}/Obit.AVX-1.1.648.tar.gz | tar xzf -
+	$ export  OBIT_URL=https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/
+	$ curl ${OBIT_URL}/Obit.AVX-1.1.648.tar.gz | tar xzf -
 ```
 
 2. Download KATObitPipe:
 ```
-	git clone https://github.com/mauch/KATObitPipe
+	$ git clone https://github.com/mauch/KATObitPipe
 ```
 
 3. Copy the setup.sh Obit script to the current dir:
 ```
-	cp KATObitPipe/setup.sh .
+	$ cp KATObitPipe/setup.sh .
 ```
 
 4. Modify the first line of setup.sh so that OBIT_ROOT points to the dir you have put the Obit distro - In this example:
 ```
-	export OBIT_ROOT=/home/tmauch/Obit/obit-distro-1.1.648
+	$ export OBIT_ROOT=/home/tmauch/Obit/obit-distro-1.1.648
 ```
 
 5. Source the Obit setup script:
 ```
-	source setup.sh
+	$ source setup.sh
 ```
 
 6. Copy the static metadata from KATObitPipe distro into Obit, unzip the models, and chmod them to 777 (otherwise Obit can’t see them):
 ```
-	cp ./KATObitPipe/FITS/* ${OBIT_ROOT}/share/obit/data
-	gunzip ${OBIT_ROOT}/share/obit/data/*.fits.gz
-	chmod -R 777 ${OBIT_ROOT}/share/obit/data/*.fits.gz
+	$ cp ./KATObitPipe/FITS/* ${OBIT_ROOT}/share/obit/data
+	$ gunzip ${OBIT_ROOT}/share/obit/data/*.fits.gz
+	$ chmod -R 777 ${OBIT_ROOT}/share/obit/data/*.fits.gz
 ```
 
 7. Copy the Obit static metadata dir to the place KATObitPipe sees it by default:
 ```
-	mkdir ${OBIT}/share
-	mv ${OBIT_ROOT}/share/obit/data ${OBIT}/share
+	$ mkdir ${OBIT}/share
+	$ mv ${OBIT_ROOT}/share/obit/data ${OBIT}/share
 ```
 
 8. Remove the `libgfortran` from the Obit binaries and use the system installed one instead. (The version this that ships with Obit causes the AIPS tasks download on-the-fly by KATObitPipe to crash - so use the system `libgfortran` instead. This assumes `libgfortran` is installed on your system - in debian based linux use `apt install libgfortran` or something similar).
 ```
-	rm -rf ${OBIT_ROOT}/lib/libgfortran*
+	$ rm -rf ${OBIT_ROOT}/lib/libgfortran*
 ```
 
 8. Install KATObitPipe:
 ```
-	pip install KATObitPipe
+	$ pip install KATObitPipe
 ```
