@@ -23,7 +23,11 @@ Download from github and pip install the package on your own machine with an ins
 Run the Calibration Pipeline
 ----------------------------
 
-Once the Obit environment is setup, usually using `source setup.sh` with `setup.sh` containing environment variables pointing to the appropriate location of the Obit installation (see [setup.sh](/setup.sh) for an example). KATObitPipe should be installed as above you can run the calibration script with
+Once the Obit environment is setup, usually using `source setup.sh` with `setup.sh` containing environment variables pointing to the appropriate location of the Obit installation (see [setup.sh](/setup.sh) for an example). KATObitPipe should be installed as above. After this you can run the calibration script from anywhere.
+
+You will need disk space in the current working directory where you run the script to store the data as it is copied over from the archive, a typical 8 hour, 4096 channel, 8s dump observation will require approx 1.5 TB of disk space for processing.
+
+In your desired run location you run the calibration script with:
 
 ```
 	$ KATCalPipe.py RDB
@@ -44,7 +48,7 @@ A typical example of a run on the observation with CBID=1592263862 stored in a f
 ```
 	$ KATCalPipe.py --flag --gzip --polcal 1592263862_sdp_l0.full.rdb
 ```
-This will run the calibration pipeline, re-flag the data (ie. throw away all the cal_rfi flags and recompute them on the fly), gzip the output UV table file and run in `polcal` mode, which means downloading the associated delaycal observation and perfoeming XY-Phase calibration on it before doing the full calibration on the average of the H&V polarisations.
+This will run the calibration pipeline, re-flag the data (ie. throw away all the cal_rfi flags and recompute them on the fly), gzip the output UV table file and run in `polcal` mode, which means downloading the associated delaycal observation and performing XY-Phase calibration on it before doing the full calibration on the average of the H&V polarisations.
 
 Using the option `--reuse` you can bypass the downloading of the data into the aipsdisk from the archive, and use the data already downloaded from a previous run. This takes the data from *after* the Hanning step.
 
@@ -98,11 +102,11 @@ You can build and run a Docker image with the appropriate Obit and `KATObitPipe`
 
 Just a quick explanation of the options to docker run:
 
-`-t`: Means emulate a pseudo-TTY in the container - Obit needs a TTY for log messages
+`-t`: Means emulate a pseudo-TTY in the container. Obit needs a TTY for log messages.
 
 `--rm`: Means delete the container after the end of the run (otherwise you end up with loads of dangling containers in your system)
 
-`-v ${PWD}:/scratch` : Means mount the current directory inside the container as /scratch - which is where the script will run in the container.
+`-v ${PWD}:/scratch` : Means mount the current directory inside the container as /scratch. This is where the script will run in the container.
 
 `-e LOCAL_USER_ID=$(id -u) -e LOCAL_GROUP_ID=$(id -g)` : Means make your current user id and user group inside the container so that output files are written as your user rather than 'root'.
 
