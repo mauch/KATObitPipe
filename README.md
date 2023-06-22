@@ -104,7 +104,7 @@ Installing Obit binary distribution on the SARAO comXX machines
 
 1. Download and untar the desired binary package (r648 in the example below). Available Obit binary distributions can be found at https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/:
 ```
-	$ export  OBIT_URL=https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/
+	$ export OBIT_URL=https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/
 	$ curl ${OBIT_URL}/Obit.AVX-1.1.648.tar.gz | tar xzf -
 ```
 
