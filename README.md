@@ -163,5 +163,5 @@ Installing Obit binary distribution on the SARAO comXX machines
 
 10. Install KATObitPipe:
 ```
-	$ pip install KATObitPipe
+	$ pip install ./KATObitPipe
 ```
