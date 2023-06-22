@@ -6,6 +6,13 @@ Obit based calibration and imaging scripts for MeerKAT.
 Quick Install Guide
 -------------------
 
+Create a working install directory and install from there eg.:
+
+```
+	$ mkdir ~/Obit
+	$ cd ~Obit
+```
+
 Download from github and pip install the package on your own machine with an installation and setup of [Obit](https://www.cv.nrao.edu/~bcotton/Obit.html). For help setting up Obit for yourself from a binary distribution see the section [Installing Obit binary distribution on the SARAO comXX machines](https://github.com/mauch/KATObitPipe/edit/master/README.rst#installing-obit-binary-distribution-on-the-sarao-comxx-machines) below.
 
 ```
@@ -16,7 +23,7 @@ Download from github and pip install the package on your own machine with an ins
 Run the Calibration Pipeline
 ----------------------------
 
-Once the Obit environment is setup and KATObitPipe is installed as above you can run the calibration script with
+Once the Obit environment is setup, usually using `source setup.sh` with `setup.sh` containing environment variables pointing to the appropriate location of the Obit installation (see [setup.sh](/setup.sh) for an example). KATObitPipe should be installed as above you can run the calibration script with
 
 ```
 	$ KATCalibPipe.py RDB
@@ -32,7 +39,7 @@ There are numerous options to the script, doing
 
 will list them and describe what they do.
 
-A typical example of a run on the observation with CBID=1592263862 stored in a file downloads from the archive and renamed to `1592263862_sdp_l0.full.rdb` is:
+A typical example of a run on the observation with CBID=1592263862 stored in a file downloaded from the archive and renamed to `1592263862_sdp_l0.full.rdb` is:
 
 ```
 	$ KATCalPipe.py --flag --gzip --polcal 1592263862_sdp_l0.full.rdb
