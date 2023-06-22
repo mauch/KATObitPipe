@@ -41,6 +41,30 @@ This will run the calibration pipeline, re-flag the data (ie. throw away all the
 
 Using the option `--reuse` you can bypass the downloading of the data into the aipsdisk from the archive, and use the data already downloaded from a previous run. This takes the data from *after* the Hanning step.
 
+Typical Output of the Pipeline
+------------------------------
+
+A directory listing of what you should see after the pipeline has run with the example above is:
+```
+1592263862.CalTab.uvtab  1592263862.refAnt.pickle  1592263862_APCal2.ps     1592263862_Spec.ps          da00
+1592263862.Parms.pickle  1592263862.uvtab.gz       1592263862_DelayCal.ps   1592263862_sdp_l0.full.rdb  aipsdisk
+1592263862.log           1592263862_APCal.ps       1592263862_DelayCal2.ps  31DEC22
+```
+
+`1592263862.CalTab.uvtab` : Contains the AIPS calibration tables that were derived and applied to the data.
+
+`1592263862.uvtab.gz` : Countains the calibrated UV data in UVTab format (it is gzipped because of the `--gzip` option used in the example above.
+
+`*.pickle` : Serialised outputs of pipeline parameters `Parms.pickle` and derived reference antenna `refAnt.pickle`.
+
+`*.ps` : Plots of delays, bandpasses, Gains derived during the pipeline run.
+
+`1592263862.log` : logfile output by the run
+
+`aipsdisk` : This cotains the UV data in AIPS UV format, and can be used to run the pipeline in `--reuse` mode.
+
+`31DEC22 da00` : These are the residual AIPS run files used by the AIPS tasks in the pipeline.
+
 Easy Installation and Running using Docker
 ------------------------------------------
 
@@ -66,9 +90,13 @@ You can build and run a Docker image with the appropriate Obit and `KATObitPipe`
 ```
 
 Just a quick explanation of the options to docker run:
+
 `-t`: Means emulate a pseudo-TTY in the container - Obit needs a TTY for log messages
+
 `--rm`: Means delete the container after the end of the run (otherwise you end up with loads of dangling containers in your system)
+
 `-v ${PWD}:/scratch` : Means mount the current directory inside the container as /scratch - which is where the script will run in the container.
+
 `-e LOCAL_USER_ID=$(id -u) -e LOCAL_GROUP_ID=$(id -g)` : Means make your current user id and user group inside the container so that output files are written as your user rather than 'root'.
 
 Installing Obit binary distribution on the SARAO comXX machines
