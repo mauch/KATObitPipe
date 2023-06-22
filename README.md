@@ -26,7 +26,7 @@ Run the Calibration Pipeline
 Once the Obit environment is setup, usually using `source setup.sh` with `setup.sh` containing environment variables pointing to the appropriate location of the Obit installation (see [setup.sh](/setup.sh) for an example). KATObitPipe should be installed as above you can run the calibration script with
 
 ```
-	$ KATCalibPipe.py RDB
+	$ KATCalPipe.py RDB
 ```
 
 The `RDB` can be an https URL to an observation in the MeerKAT archive (with associated token) or simply a `.rdb` filename downloaded from the archive.
