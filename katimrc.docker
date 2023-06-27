@@ -10,4 +10,5 @@
 # Note: default values are used when RHS of assignment is blank       #
 #######################################################################
 [KATPIPE]
-metadata_dir = /Obit/obit-distro-1.1.630/share/obit/data
+aips_dir = /aips
+aips_ver = 31DEC22
