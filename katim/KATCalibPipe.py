@@ -48,6 +48,7 @@ def MKContPipeline(files, outputdir, **kwargs):
         katdal_options = kwargs.get('katdal_options', {})
         katdal_options.setdefault('retries', 2)
         katdal_options.setdefault('timeout', 300)
+        print(katdal_options)
         katdata = katfile.open(h5file, **katdal_options)
         OK = True
     except Exception as exception:

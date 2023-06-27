@@ -782,7 +782,8 @@ def KATInitTargParms(katdata,parms,err):
         PCals = []
         tcals = []
         for cal in parms["PCal"]:
-            PCals.append(EVLACalModel(cal[0:12]))
+            #PCals.append(EVLACalModel(cal[0:12]))
+            PCals.append(EVLACalModel(cal[0:12],CalDisk=1,CalDataType='FITS',CalFile=modelfile,CalCCVer=1,CalCmode='COMP',CalNfield=1))
             tcals.append(cal)
         # Check for standard model
         EVLAStdModel(PCals, parms["KAT7Freq"])
