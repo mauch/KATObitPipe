@@ -33,13 +33,19 @@ RUN virtualenv -p /usr/bin/python3 /ve3 && \
 ENV PATH="/ve3/bin:${PATH}"
 ENV VIRTUAL_ENV="/ve3"
 
+# Install the pipeline
+COPY . /KATObitPipe
+WORKDIR /KATObitPipe
+RUN pip install -r requirements.txt
+RUN pip install .
+
 # Retrieve Obit and set up environment
 ENV OBIT_BASE_PATH="/Obit"
-ENV OBIT_REVISION="630"
+ENV OBIT_REVISION="648"
 ENV OBIT_TARBALL="Obit.AVX-1.1.${OBIT_REVISION}.tar.gz"
 
 RUN mkdir -p $OBIT_BASE_PATH && cd $OBIT_BASE_PATH && \
-    curl https://svn.cv.nrao.edu/obit/linux_distro/${OBIT_TARBALL} | tar xzf -
+    curl https://www.cv.nrao.edu/~bcotton/ObitBin/linux_distro/${OBIT_TARBALL} | tar xzf -
 
 ENV OBIT_ROOT="${OBIT_BASE_PATH}/obit-distro-1.1.${OBIT_REVISION}"
 ENV OBIT="${OBIT_ROOT}/lib/obit"
@@ -52,18 +58,18 @@ ENV PYTHONPATH="${OBIT_ROOT}/share/obittalk/python:${OBIT_ROOT}/share/python:${P
 RUN rm ${OBIT_ROOT}/lib/libgfortran*
 RUN ln -s /usr/lib/x86_64-linux-gnu/libgfortran.so.3 ${OBIT_ROOT}/lib
 
-# Install the pipeline
-COPY . /KATObitPipe
-WORKDIR /KATObitPipe
-
 # Copy metadata to Obit share
 RUN cp ./FITS/* ${OBIT_ROOT}/share/obit/data
 RUN cd ${OBIT_ROOT}/share/obit/data && gunzip *.fits.gz
 RUN chmod -R 777 ${OBIT_ROOT}/share/obit/data
 
+# Point the pipeline to the obit share
+RUN echo "metadata_dir = ${OBIT_ROOT}/share/obit/data" >> katimrc.docker
 
-RUN pip install -r requirements.txt
-RUN pip install .
+# Copy the required AIPS to /aips
+RUN tar zxvf 31DEC22.tar.gz
+RUN mkdir /aips
+RUN mv 31DEC22 /aips/31DEC22
 
 RUN mkdir /scratch
 VOLUME /scratch

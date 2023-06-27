@@ -459,6 +459,7 @@ def KATh5Select(katdata, parms, err, **kwargs):
         (3) Select < 30 calibrators (a limit on obit imager).
         (4) Select the first spectral window (a limit on obit imager)
         (5) Select frequency range (overrideable via kwargs)
+        (6) Select `compscans='track'` to remove reference pointing scans.
 
     The checks performed on the attenuated view are as follows:
         (1) Check that there are at least 4 antannas.
@@ -502,7 +503,7 @@ def KATh5Select(katdata, parms, err, **kwargs):
 
     #reducing data selections
     # Tracks only
-    katdata.select(scans='track', reset='')
+    katdata.select(scans='track', compscans='track', reset='')
 
     # Elevation > 20deg.
     good_elevations = []

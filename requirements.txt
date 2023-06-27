@@ -1,7 +1,7 @@
-astropy==4.1
-matplotlib==3.3.4
-numba==0.52.0
-numpy==1.22.0
+astropy
+matplotlib
+numba
+numpy
 
 katdal @ git+https://github.com/ska-sa/katdal
 katpoint @ git+https://github.com/ska-sa/katpoint
