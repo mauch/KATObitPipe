@@ -320,7 +320,7 @@ def KATInitRFIMask(katdata, usermask, fitsdisk, logFile):
     """
 
     sw = katdata.spectral_windows[katdata.spw]
-    sflags = np.zeros(sw.num_chans, dtype=np.bool)
+    sflags = np.zeros(sw.num_chans, dtype=bool)
 
     if usermask is '':
         # No user supplied mask
@@ -337,7 +337,7 @@ def KATInitRFIMask(katdata, usermask, fitsdisk, logFile):
             sflags = np.repeat(sflags, sw.num_chans // 1024)
         else:
             # No mask!
-            sflags = np.zeros(sw.num_chans, dtype=np.bool)
+            sflags = np.zeros(sw.num_chans, dtype=bool)
     else:
         # Get User supplied mask
         sflags = FetchObject(usermask)

@@ -274,7 +274,7 @@ def GetKATMeta(katdata, err):
         OErr.printErrMsg(err, msg)
         raise KATUnimageableError(msg)
     #Set up array linking corr products to indices
-    dl = numpy.empty((out["nants"], out["nants"], nstokes), dtype=numpy.int)
+    dl = numpy.empty((out["nants"], out["nants"], nstokes), dtype=int)
     bl = []
     for idx, d in enumerate(katdata.corr_products):
         a1 = antnums.index(alook[d[0][:-1]])
@@ -777,7 +777,7 @@ def MakeTemplate(inuv, outuv, katdata):
     vistable.del_col('VISIBILITIES')
     newvis = pyfits.Column(name='VISIBILITIES', format='%dE'%(3*numstokes*numchans),
                            dim='(3,%d,%d,1,1,1)'%(numstokes,numchans,),
-                           array=numpy.zeros((nvispio,1,1,1,numchans,numstokes,3,), dtype=numpy.float32))
+                           array=numpy.zeros((1,1,1,numchans,numstokes,3,), dtype=numpy.float32))
     vistable.add_col(newvis)
     vishdu = pyfits.BinTableHDU.from_columns(vistable)
     for key in list(uvfits[1].header.keys()):
@@ -787,6 +787,9 @@ def MakeTemplate(inuv, outuv, katdata):
     newuvfits = pyfits.HDUList([uvfits[0],vishdu,uvfits[2],uvfits[3],uvfits[4],uvfits[5],uvfits[6]])
     #Add nvispio rows
     newuvfits.writeto(outuv, overwrite=True)
+    uvfits = pyfits.open(outuv, mode='update')
+    uvfits[1].data = uvfits[1].data.repeat(nvispio)
+    uvfits.flush()
 
 def flag_data(vs,fg,flagger):
     """
