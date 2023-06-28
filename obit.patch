@@ -1,0 +1,276 @@
+Index: Obit/ObitSystem/Obit/Makefile.in
+===================================================================
+--- Obit/ObitSystem/Obit/Makefile.in	(revision 651)
++++ Obit/ObitSystem/Obit/Makefile.in	(working copy)
+@@ -74,35 +74,35 @@
+ 	cd dummy_xmlrpc; $(MAKE)
+ 
+ # update tables from documentation directory
+-tableupdate: 
++tableupdate:
+ 	perl bin/ObitTables.pl
+ 
+ # update documentation directory
+-docupdate: 
++docupdate:
+ 	cd doc; $(MAKE)
+ 
+ # update source/object directory
+-srcupdate: 
++srcupdate:
+ 	cd src; $(MAKE)
+ 
+ # update library directory
+-libupdate: 
+-	cd lib; $(MAKE) RANLIB="$(RANLIB)"
++libupdate: srcupdate
++	cd lib; $(MAKE) RANLIB="$(RANLIB)" CC="$(CC)"
+ 
+ # update test software directory
+-testupdate: 
++testupdate: libupdate
+ 	cd test; $(MAKE)
+ 
+ # update task software directory
+-taskupdate: 
++taskupdate: libupdate
+ 	cd tasks; $(MAKE)
+ 
+ # update work directory
+-work: 
++work:
+ 	cd src/work; $(MAKE) CC="$(CC)" CFLAGS="$(CFLAGS)" LIB="$(LIB)"
+ 
+ # update python directory
+-pythonupdate: 
++pythonupdate: libupdate
+ 	cd python; $(MAKE)
+ 
+ # update from cvs repository
+@@ -121,7 +121,7 @@
+ 	echo "Testing not yet implemented"
+ 
+ # make gzipped tar backup of directory
+-backup:	
++backup:
+ 	cd ..;rm -f $(ARCHIVE).tgz
+ 	cd ..;gtar czvf $(ARCHIVE).tgz \
+ 		$(DIRN)/bin/*.pl  \
+@@ -152,7 +152,7 @@
+ 		$(DIRN)/include/CVS/* $(DIRN)/lib/CVS/*
+ 
+ # make gzipped tar distribution
+-distrib:	
++distrib:
+ 	cd ..;rm -f $(DISTRIB).tgz
+ 	cd ..;gtar czvf $(DISTRIB).tgz \
+ 		$(DIRN)/README $(DIRN)/LICENSE           \
+@@ -178,10 +178,10 @@
+ 		$(DIRN)/dummy_xmlrpc/*.c $(DIRN)/dummy_xmlrpc/*.h \
+ 		$(DIRN)/dummy_xmlrpc/Make* $(DIRN)/dummy_xmlrpc/README \
+ 		$(DIRN)/config* $(DIRN)/aclocal.m4 $(DIRN)/install-sh \
+-		$(DIRN)/mkinstalldirs $(DIRN)/missing $(DIRN)/m4/* 
++		$(DIRN)/mkinstalldirs $(DIRN)/missing $(DIRN)/m4/*
+ 
+ # make gzipped tar distribution of only software
+-copy:	
++copy:
+ 	cd ..;rm -f $(DISTRIB)Src.tgz
+ 	cd ..;gtar czvf $(DISTRIB)Src.tgz \
+ 		$(DIRN)/README $(DIRN)/LICENSE           \
+@@ -204,7 +204,7 @@
+ 		$(DIRN)/dummy_xmlrpc/*.c $(DIRN)/dummy_xmlrpc/*.h \
+ 		$(DIRN)/dummy_xmlrpc/Make* $(DIRN)/dummy_xmlrpc/README \
+ 		$(DIRN)/tasks/Makefile* $(DIRN)/tasks/*.h   \
+-		$(DIRN)/tasks/*.c  $(DIRN)/tasks/*.doc $(DIRN)/TDF/*.TDF 
++		$(DIRN)/tasks/*.c  $(DIRN)/tasks/*.doc $(DIRN)/TDF/*.TDF
+ 
+ clean:
+ 	cd src;  $(MAKE) clean
+Index: Obit/ObitSystem/Obit/lib/Makefile
+===================================================================
+--- Obit/ObitSystem/Obit/lib/Makefile	(revision 651)
++++ Obit/ObitSystem/Obit/lib/Makefile	(working copy)
+@@ -34,7 +34,7 @@
+ #
+ #------------------------------------------------------------------------
+ # targets to build
+-TARGETS =  libObit.a
++TARGETS =  libObit.a libObit.so
+ SHTARGETS = libObit.so
+ 
+ # list of object modules
+@@ -50,8 +50,7 @@
+ 
+ #  build shared Obit library, put in dependencies library
+ libObit.so: ${OBJECTS}
+-	gcc -shared -o libObit.so  ${OBJECTS}
+-	cp libObit.so ../../../deps/lib
++	gcc -shared -o libObit.so  ${OBJECTS} -lglib-2.0 -lpthread -lgthread-2.0
+ 
+ clean:
+ 	rm -f $(TARGETS) $(SHTARGETS)
+Index: Obit/ObitSystem/Obit/python/Makefile.in
+===================================================================
+--- Obit/ObitSystem/Obit/python/Makefile.in	(revision 651)
++++ Obit/ObitSystem/Obit/python/Makefile.in	(working copy)
+@@ -43,7 +43,7 @@
+ CC = @CC@
+ #CPPFLAGS = @CPPFLAGS@
+ CPPFLAGS = 
+-CFLAGS = @CFLAGS@
++CFLAGS = @CFLAGS@ -msse -mavx -mavx2 -DHAVE_AVX=1 -DHAVE_AVX2=1
+ LDFLAGS = @LDFLAGS@
+ 
+ ALL_CPPFLAGS = $(CPPFLAGS) -I$(top_srcdir)/include @CFITSIO_CPPFLAGS@ \
+@@ -107,10 +107,10 @@
+ 
+ # Write compile/link info to setupdata.py
+ setupdata.py: Makefile
+-	echo "CFLAGS='$(ALL_CFLAGS)'">setupdata.py
++	echo "CFLAGS='$(ALL_CFLAGS) $(CUDA_FLAGS)'">setupdata.py
+ 	echo "CPPFLAGS='$(CLIENT_CPPFLAGS) $(SERVER_CPPFLAGS)'">>setupdata.py
+ 	echo "LDFLAGS='$(CLIENT_LDFLAGS) $(SERVER_LDFLAGS)'">>setupdata.py
+-	echo "LIBS='$(CLIENT_LIBS) $(SERVER_LIBS)'">>setupdata.py
++	echo "LIBS='$(CLIENT_LIBS) $(SERVER_LIBS) $(CUDA_LIB)'">>setupdata.py
+ 
+ clean:
+ 	rm -f Obit.i *.o *.so *.pyc	
+Index: Obit/ObitSystem/Obit/python/makesetup.py
+===================================================================
+--- Obit/ObitSystem/Obit/python/makesetup.py	(revision 651)
++++ Obit/ObitSystem/Obit/python/makesetup.py	(working copy)
+@@ -111,6 +111,6 @@
+ outfile.write('                              extra_compile_args='+str(compileArgs)+','+os.linesep)
+ outfile.write('                              library_dirs='+str(libDirs)+','+os.linesep)
+ outfile.write('                              libraries='+str(libs)+','+os.linesep)
+-outfile.write('                              runtime_library_dirs='+str(runtimeLibDirs)+')],'+os.linesep)
+-outfile.write('       include_dirs='+str(incDirs)+os.linesep)
++outfile.write('                              runtime_library_dirs='+str(runtimeLibDirs)+','+os.linesep)
++outfile.write('       include_dirs='+str(incDirs)+')]'+os.linesep)
+ outfile.write(')')
+Index: Obit/ObitSystem/Obit/src/Makefile.in
+===================================================================
+--- Obit/ObitSystem/Obit/src/Makefile.in	(revision 651)
++++ Obit/ObitSystem/Obit/src/Makefile.in	(working copy)
+@@ -34,21 +34,23 @@
+ # library directory for object files
+ LIBDIR = $(top_srcdir)/lib/
+ 
++NVCC = nvcc
+ CC = @CC@
+-CPPFLAGS = @CPPFLAGS@ 
++CPPFLAGS = @CPPFLAGS@
+ # Turn off memory usage checking
+-CFLAGS = -Wall -fno-strict-aliasing @CFLAGS@ -DFASTOBITMEM 
++# Add AVX instructions
++CFLAGS = -fno-strict-aliasing @CFLAGS@ -DFASTOBITMEM -msse -mavx -mavx2 -lstdc++
+ LDFLAGS = @LDFLAGS@
+ LIBS = @LIBS@
+-DEFS = @DEFS@
++DEFS = @DEFS@ -DHAVE_AVX=1 -DHAVE_AVX2=1
+ 
+ ALL_CPPFLAGS = $(CPPFLAGS) -I$(top_srcdir)/include $(DEFS) \
+-	@CFITSIO_CPPFLAGS@ @FFTW_CPPFLAGS@ @FFTW3_CPPFLAGS@ @XMLRPC_SERVER_CPPFLAGS@ 
++	@CFITSIO_CPPFLAGS@ @FFTW_CPPFLAGS@ @FFTW3_CPPFLAGS@ @XMLRPC_SERVER_CPPFLAGS@
+ ALL_CFLAGS = $(CFLAGS) @GSL_CFLAGS@ @GLIB_CFLAGS@ @PLPLOT_CFLAGS@ \
+ 	@PGPLOT_CFLAGS@ @ZLIB_CFLAGS@ @WVR_CFLAGS@
+ 
+ # teach how to compile
+-.c.o:	
++.c.o:
+ 	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $<
+ 	mv $@.o $(LIBDIR)
+ 
+@@ -58,9 +60,8 @@
+ 
+ CTARGETS := $(addprefix $(LIBDIR),$(OBJECTS))
+ 
++all:  $(CTARGETS) $(CUDA_TARGETS)
+ 
+-all:  $(CTARGETS) 
+-
+ # generic C compile
+ $(CTARGETS): $(LIBDIR)%.o: %.c $(wildcard ../include/%*.h)
+ 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $*.c
+@@ -67,5 +68,5 @@
+ 	mv ./$*.o $@
+ 
+ clean:
+-	rm -f $(CTARGETS)
++	rm -f $(CTARGETS) $(CUDA_TARGETS)
+ 	rm -f *.o
+Index: Obit/ObitSystem/Obit/tasks/Makefile.in
+===================================================================
+--- Obit/ObitSystem/Obit/tasks/Makefile.in	(revision 651)
++++ Obit/ObitSystem/Obit/tasks/Makefile.in	(working copy)
+@@ -39,19 +39,19 @@
+ 
+ CC = @CC@
+ CPPFLAGS = @CPPFLAGS@
+-CFLAGS = -Wall -fno-strict-aliasing -Wall -DFASTOBITMEM @CFLAGS@
++CFLAGS = -fno-strict-aliasing -DFASTOBITMEM -msse -mavx -mavx2 -DHAVE_AVX=1 -DHAVE_AVX2=1 @CFLAGS@
+ LDFLAGS = @LDFLAGS@
+ 
+ SERVER_CPPFLAGS = @XMLRPC_SERVER_CPPFLAGS@
+-SERVER_CFLAGS = 
++SERVER_CFLAGS =
+ SERVER_LDFLAGS = $(LDFLAGS) @XMLRPC_SERVER_LDFLAGS@
+-SERVER_LIBS =  @XMLRPC_SERVER_LIBS@ 
++SERVER_LIBS =  @XMLRPC_SERVER_LIBS@
+ 
+ CLIENT_CPPFLAGS = @XMLRPC_CLIENT_CPPFLAGS@
+ CLIENT_CFLAGS = @ZLIB_CFLAGS@
+-CLIENT_LDFLAGS = @XMLRPC_CLIENT_LDFLAGS@ @ZLIB_LDFLAGS@ 
++CLIENT_LDFLAGS = @XMLRPC_CLIENT_LDFLAGS@ @ZLIB_LDFLAGS@
+ CLIENT_LIBS = @XMLRPC_LIBS@  @GSL_LIBS@ @ZLIB_LIBS@  \
+-        @XMLRPC_CLIENT_LIBS@ 
++        @XMLRPC_CLIENT_LIBS@
+ 
+ ALL_CPPFLAGS = $(CPPFLAGS) -I$(top_srcdir)/include @CFITSIO_CPPFLAGS@ \
+ 	@FFTW_CPPFLAGS@  @FFTW3_CPPFLAGS@  $(CLIENT_CPPFLAGS) $(SERVER_CPPFLAGS) @PLPLOT_CPPFLAGS@ \
+@@ -63,26 +63,32 @@
+ 	 @GSL_LDFLAGS@ @PLPLOT_LDFLAGS@ @PGPLOT_LDFLAGS@ @WVR_LDFLAGS@ \
+ 	$(CLIENT_LDFLAGS) $(SERVER_LDFLAGS)
+ 
+-LIBS = ../lib/libObit.a @CFITSIO_LIBS@ @FFTW_LIBS@ @FFTW3_LIBS@ @GLIB_LIBS@ \
+-	@GSL_LIBS@ @PLPLOT_LIBS@ @PGPLOT_LIBS@ $(CLIENT_LIBS) $(SERVER_LIBS) \
+-	@LIBS@ @FLIBS@ @GTHREAD_LIBS@ @WVR_LIBS@
++# Static library option
++# OBIT_LIB_TARGET = ../lib/libObit.a
++# OBIT_LIB = ../lib/libObit.a
++# Shared library option
++OBIT_LIB_TARGET = ../lib/libObit.so
++OBIT_LIB = -L../lib -lObit
+ 
++LIBS = $(OBIT_LIB) @CFITSIO_LIBS@ @FFTW_LIBS@ @FFTW3_LIBS@ @GLIB_LIBS@ \
++        @GSL_LIBS@ @PLPLOT_LIBS@ @PGPLOT_LIBS@ $(CLIENT_LIBS) $(SERVER_LIBS) \
++        @LIBS@ @FLIBS@ @GTHREAD_LIBS@ @WVR_LIBS@
+ 
+ # get list of all c source files (*.c) files
+ AllC    := $(wildcard *.c)
+-EXECU   := $(patsubst %.c,%, $(AllC))
++EXECU   := $(patsubst %.c, %, $(AllC)) 
+ TARGETS := $(addprefix $(BINDIR),$(EXECU))
+ 
+ all: $(TARGETS)
+ 
+ # generic C compile/link
+-$(TARGETS): $(BINDIR)% : %.c ../lib/libObit.a  
++$(TARGETS): $(BINDIR)% : %.c $(OBIT_LIB_TARGET)
+ 	echo "compile $*.c"
+ 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) $(ALL_LDFLAGS) $*.c -o $* $(LIBS)
+ 	mv $* $(BINDIR)
+ 
+ # For specific executables
+-$(EXECU): % : %.c ../lib/libObit.a  
++$(EXECU): % : %.c $(OBIT_LIB_TARGET)
+ 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) $(ALL_LDFLAGS) $< -o $* $(LIBS)
+ 	mv $* $(BINDIR)
+ 
+@@ -89,4 +95,5 @@
+ clean:
+ 	rm -f $(TARGETS)
+ 	rm -f *.o
++	rm -f *.so 
+ 
