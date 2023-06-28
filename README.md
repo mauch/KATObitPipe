@@ -113,6 +113,8 @@ Just a quick explanation of the options to docker run:
 Installing Obit binary distribution on the SARAO comXX machines
 ---------------------------------------------------------------
 
+Please note that binary Obit requires a Python > 2.6 and <= 2.8 to run. If you require a newer Python, you will have to install Obit from Source.
+
 1. Make a working directory for your Obit installation and work from there eg:
 ```
 	$ mkdir ~/Obit
