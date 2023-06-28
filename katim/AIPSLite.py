@@ -17,7 +17,7 @@ default_year = time.gmtime().tm_year - 1
 default_version = '31DEC' + str(default_year)[-2:]
 
 # Minimum files required:
-intel_libs = ['libimf.so', 'libsvml.so', 'libreadline.so.6']
+intel_libs = ['libimf.so', 'libsvml.so', 'libreadline.so.6', 'libgfortran.so.3']
 mac_libs = ['libimf.dylib', 'libirc.dylib', 'libsvml.dylib']
 popsdat_files = ['POPSDAT.HLP']
 binary_files = ['FILAIP.EXE']

@@ -275,7 +275,7 @@ def DescAddIF (inUV, outUV, nIF, err):
         d['crota'][jlocif] = 0.0
         
     jlocf = d["jlocf"]
-    nchan = d["inaxes"][jlocf]/nIF
+    nchan = d["inaxes"][jlocf]//nIF
     d["inaxes"][jlocif] = nIF
     d["inaxes"][jlocf]  = nchan
     outUV.Desc.Dict = d
@@ -427,7 +427,7 @@ def DescMakeIF (outUV, nIF, err):
         d['crota'][jlocif] = 0.0
         
     jlocf = d["jlocf"]
-    nchan = d["inaxes"][jlocf]/nIF
+    nchan = d["inaxes"][jlocf]//nIF
     d["inaxes"][jlocif] = nIF
     d["inaxes"][jlocf]  = nchan
     outUV.Desc.Dict = d
