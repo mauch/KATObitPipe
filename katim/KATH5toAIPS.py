@@ -48,7 +48,11 @@ import UV, UVVis, OErr, UVDesc, Table, History
 from OTObit import day2dhms
 import numpy
 import itertools
+from astropy.coordinates import Angle
+from astropy.units import Quantity
+import astropy.units as u
 from astropy.io import fits as pyfits
+from katpoint import Antenna
 import multiprocessing
 import concurrent.futures
 import dask
@@ -223,13 +227,32 @@ def GetKATMeta(katdata, err):
         t = katdata.catalogue.targets[ti]
         #Aips doesn't like spaces in names!!
         name = (t.name+"                ")[0:16]
-        ras, decs = t.radec()
-        dec = UVDesc.PDMS2Dec(str(decs).replace(':',' '))
-        ra  = UVDesc.PHMS2RA(str(ras).replace(':',' '))
+        coord = t.radec()
+        ras = coord.ra.to_value(u.deg) 
+        decs = coord.dec.to_value(u.deg)
+
+        # decs is in decimal degrees
+        dec_angle = Angle(decs * u.deg)
+        dec_sexagesimal = dec_angle.to_string(unit=u.deg, sep=' ', precision=0, alwayssign=True)
+        # Example: '-63:42:45.63
+        #import pdb; pdb.set_trace()
+        dec = UVDesc.PDMS2Dec(dec_sexagesimal)
+
+        ra_angle = Angle(ras * u.deg)
+        ra_sexagesimal = ra_angle.to_string(unit=u.hourangle, sep=' ', precision=0, alwayssign=False)
+        ra  = UVDesc.PHMS2RA(ra_sexagesimal)
         # Apparent posn
-        ras, decs = t.apparent_radec()
-        deca = UVDesc.PDMS2Dec(str(decs).replace(':',' '))
-        raa  = UVDesc.PHMS2RA(str(ras).replace(':',' '))
+        coorda = t.apparent_radec()
+        ras = coorda.ra.to_value(u.deg) 
+        decs = coorda.ra.to_value(u.deg) 
+
+        dec_angle = Angle(decs * u.deg)
+        dec_sexagesimal = dec_angle.to_string(unit=u.deg, sep=' ', precision=0, alwayssign=True)
+        deca = UVDesc.PDMS2Dec(dec_sexagesimal)
+
+        ra_angle = Angle(ras * u.deg)
+        ra_sexagesimal = ra_angle.to_string(unit=u.hourangle, sep=' ', precision=0, alwayssign=False)
+        raa  = UVDesc.PHMS2RA(ra_sexagesimal)
         #Avoid duplicates
         if name in tn:
             continue
@@ -274,7 +297,7 @@ def GetKATMeta(katdata, err):
         OErr.printErrMsg(err, msg)
         raise KATUnimageableError(msg)
     #Set up array linking corr products to indices
-    dl = numpy.empty((out["nants"], out["nants"], nstokes), dtype=numpy.int)
+    dl = numpy.empty((out["nants"], out["nants"], nstokes), dtype=int)
     bl = []
     for idx, d in enumerate(katdata.corr_products):
         a1 = antnums.index(alook[d[0][:-1]])
@@ -370,11 +393,16 @@ def WriteANTable(outUV, meta, err):
     irow = 0
     for ant in meta["ants"]:
         irow += 1
-        row['NOSTA']    = [ant[0]]
-        row['ANNAME']   = [ant[1]+"    "]
-        row['STABXYZ']  = [ant[2],ant[3],ant[4]]
-        row['DIAMETER'] = [ant[5]]
-        row['POLAA']    = [90.0]
+        row['NOSTA']    = [int(ant[0])]
+        row['ANNAME']   = [str(ant[1])+"    "]
+        row['STABXYZ']  = [float(ant[2]),float(ant[3]),float(ant[4])]
+        # If ant[5] is Quantity, convert to meters
+        if hasattr(ant[5], 'to_value'):
+            row['DIAMETER'] = [float(ant[5].to_value('m'))]
+        else:
+            row['DIAMETER'] = [float(ant[5])]
+        row['POLAA']    = [float(90.0)]
+        #import pdb; pdb.set_trace()
         antab.WriteRow(irow, row,err)
         if err.isErr:
             OErr.printErrMsg(err, "Error writing AN table")
@@ -676,7 +704,12 @@ def ConvertKATData(outUV, katdata, meta, err, static=None, blmask=1.e10, antphas
     visphase_corr=load_phase_correction(antphase_adjust_filename, katdata, err)
     
     # Set up baseline vectors of uvw calculation
-    array_centre = katpoint.Antenna('', *newants[0].ref_position_wgs84)
+    X, Y, Z = newants[0].ref_position_wgs84
+    diameter = 13.5
+    mount_type = 0  # usually alt-az = 0
+    desc = f"array_centre, {X:.3f}, {Y:.3f}, {Z:.3f}, {diameter:.1f}, {mount_type}"
+    array_centre = katpoint.Antenna(desc)
+    #array_centre = katpoint.Antenna('array', *newants[0].ref_position_wgs84)
     baseline_vectors = numpy.array([array_centre.baseline_toward(antenna)
                                 for antenna in newants])
 
@@ -797,18 +830,47 @@ def flag_data(vs,fg,flagger):
     """
     with concurrent.futures.ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
         detected_flags = flagger.get_flags(vs, fg, pool)
-    return detected_flags
+    return 
+
 
 def get_uvw_coordinates(array_centre, baseline_vectors, tm, target, b):
-    # uvw calculation
-    a1 = b[:,0]
-    a2 = b[:,1]
+    # Convert astropy CartesianRepresentation objects to NumPy array
+    # of shape (N_baselines, 3)
+    baseline_vectors_array = numpy.array([
+        [vec.x.value, vec.y.value, vec.z.value] for vec in baseline_vectors
+    ])
+
+    # UVW basis for all time samples: shape (3, 3, T)
     uvw_basis = target.uvw_basis(tm, array_centre)
-    uvw_ant = numpy.tensordot(baseline_vectors, uvw_basis, ([1], [1]))
+
+    # Compute UVW coordinates using Einstein summation
+    # (N_baselines, 3_coords, T_times)
+    uvw_ant = numpy.einsum('ij,jkt->ikt', baseline_vectors_array, uvw_basis)
+
+    # Transpose to match expected shape: (T_times, N_baselines, 3_coords)
     uvw_ant = numpy.transpose(uvw_ant, (2, 0, 1))
-    uvw_coordinates = (numpy.take(uvw_ant, a1, axis=1)
-                            - numpy.take(uvw_ant, a2, axis=1))
+
+    # Extract antenna pairs
+    a1 = b[:, 0]
+    a2 = b[:, 1]
+
+    # Compute per-baseline UVW: (T_times, N_baselines, 3_coords)
+    uvw_coordinates = numpy.take(uvw_ant, a1, axis=1) - numpy.take(uvw_ant, a2, axis=1)
+
     return uvw_coordinates
+
+
+# def get_uvw_coordinates(array_centre, baseline_vectors, tm, target, b):
+#     # uvw calculation
+#     a1 = b[:,0]
+#     a2 = b[:,1]
+#     uvw_basis = target.uvw_basis(tm, array_centre)
+#     import ipdb; ipdb.set_trace()
+#     uvw_ant = numpy.tensordot(baseline_vectors, uvw_basis, ([1], [1]))
+#     uvw_ant = numpy.transpose(uvw_ant, (2, 0, 1))
+#     uvw_coordinates = (numpy.take(uvw_ant, a1, axis=1)
+#                             - numpy.take(uvw_ant, a2, axis=1))
+#     return uvw_coordinates
 
 def get_random_parameters(dbiloc, bl, uvws, tm, suid):
     """
@@ -947,7 +1009,8 @@ def get_static_flags(katdata, limit, static):
         antlookup[ant.name] = ant
     for prod, baseline in enumerate(katdata.corr_products):
         bl_vector = antlookup[baseline[0][:4]].baseline_toward(antlookup[baseline[1][:4]])
-        bl_length = numpy.linalg.norm(bl_vector)
+        bl_length = numpy.linalg.norm(bl_vector.xyz.to_value('m'))
+        #bl_length = numpy.linalg.norm(bl_vector)
         if bl_length < limit:
             static_flags[:, prod] = static
     return static_flags

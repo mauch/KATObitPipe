@@ -29,7 +29,7 @@
 #-----------------------------------------------------------------------
 import UV, Table, OErr
 import numpy      
-from numpy import numarray
+import numpy as np
 
 def UVAddIF (inUV, outUV, nIF, err):
     """ 
@@ -223,10 +223,10 @@ def CopyData (inUV, outUV, err):
         OErr.printErrMsg(err, "Error opening UV")
     # Get IO buffers as numpy arrays
     shape = len(inUV.VisBuf) / 4
-    ibuffer =  numarray.array(sequence=inUV.VisBuf,
-                             type=numarray.Float32, shape=shape)
-    obuffer =  numarray.array(sequence=outUV.VisBuf,
-                             type=numarray.Float32, shape=shape)
+    ibuffer =  np.array(sequence=inUV.VisBuf,
+                             type=np.Float32, shape=shape)
+    obuffer =  np.array(sequence=outUV.VisBuf,
+                             type=np.Float32, shape=shape)
     od['numVisBuff'] = 1; # Gotta tell it to write 1 vis
     outUV.Desc.Dict   = od
     outUV.IODesc.Dict = od
@@ -430,6 +430,8 @@ def DescMakeIF (outUV, nIF, err):
     nchan = d["inaxes"][jlocf]/nIF
     d["inaxes"][jlocif] = nIF
     d["inaxes"][jlocf]  = nchan
+    if 'inaxes' in d:
+        d['inaxes'] = [int(x) for x in d['inaxes']]
     outUV.Desc.Dict = d
     UV. PGetIODesc(outUV).Dict = d  # And your little dog too
     # Update

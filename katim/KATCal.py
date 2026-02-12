@@ -2,6 +2,7 @@
 """
 """
 from . import AIPSLiteTask as AIPSTask
+import astropy.units as u
 import UV, UVDesc, Image, ImageDesc, FArray, ObitTask, AIPSDir, OErr, History
 import InfoList, Table, OSystem, OASDM
 from AIPSData import AIPSImage
@@ -21,6 +22,7 @@ import sys
 import numpy as np
 import itertools
 import datetime
+import re
 import xml.dom.minidom
 import katpoint
 import katdal
@@ -322,7 +324,7 @@ def KATInitRFIMask(katdata, usermask, fitsdisk, logFile):
     sw = katdata.spectral_windows[katdata.spw]
     sflags = np.zeros(sw.num_chans, dtype=np.bool)
 
-    if usermask is '':
+    if usermask=='':
         # No user supplied mask
         sw = katdata.spectral_windows[katdata.spw]
         # Pick up static flags default file
@@ -377,7 +379,8 @@ def KATGetObsParms(obsdata, katdata, parms, logFile):
     antennas = obsdata["katdata"].ants
     longBline = 0.0
     for ant1,ant2 in itertools.combinations(antennas,2):
-        thisBline=np.linalg.norm(ant1.baseline_toward(ant2))
+        vec = ant1.baseline_toward(ant2)
+        thisBline=np.linalg.norm(vec.xyz)
         if thisBline>longBline:
             longBline=thisBline
     parms["longBline"] = longBline
@@ -417,19 +420,42 @@ def KATh5Condition(katdata, caldata, err):
     """
     # Loop through targets
     havebpcal=False
-    for targ in katdata.catalogue.targets:
+    for i, targ in enumerate(katdata.catalogue.targets):
         #Replace spaces in the name with underscores
-        targ.name=targ.name.replace(' ','_')[0:12]
+        new_name = targ.name.replace(' ', '_')[0:12]
+        # Clean description string: remove np.float64(...) wrappers
+        desc = str(targ.description).replace(targ.name, new_name)
+        desc = re.sub(r'np\.float64\(([-+]?[0-9]*\.?[0-9]+)\)', r'\1', desc)
+
+        # Create new Target
+        new_targ = katpoint.Target(desc)
+        targ = new_targ
+        #targ.name=targ.name.replace(' ','_')[0:12]
         #Also remove ':' which AIPS has trouble with
-        targ.name=targ.name.replace(':','_')[0:12]
+        #targ.name=targ.name.replace(':','_')[0:12]
         #Get the nearest calibrator in caldata.
+        antenna = katdata.ants[0]
+        caldata.antenna = antenna
+        targ.antenna = antenna
         fluxcal,offset=caldata.closest_to(targ)
         # Update the calibrator flux model
-        if offset*3600.0 < 4.0 and 'bpcal' in targ.tags:
+        offset_deg = offset.to_value(u.deg)
+        if offset_deg*3600 < 4.0 and 'bpcal' in targ.tags:
             # 4.0 arcseconds should be close enough...
             targ.flux_model = fluxcal.flux_model
             if targ.name != fluxcal.name:
-                targ.name = fluxcal.name
+                # Create a new target with correct name
+                try:
+                    new_targ2 = katpoint.Target("%s, %s" % (fluxcal.name, desc))
+                except ValueError:
+                    # fallback if description invalid, just keep old target
+                    new_targ2 = targ
+                else:
+                    new_targ2.tags = targ.tags.copy()
+                    new_targ2.flux_model = targ.flux_model
+                # Replace in catalogue and in loop variable
+                katdata.catalogue.targets[i] = new_targ2
+                targ = new_targ2
         else:                            # Not a bandpass calibrator
             if 'bpcal' in targ.tags: targ.tags.remove('bpcal')
         if 'bpcal' in targ.tags:
@@ -511,7 +537,9 @@ def KATh5Select(katdata, parms, err, **kwargs):
         # Fetch data
         tm = katdata.timestamps[:]
         nint = len(tm)
-        el=target.azel(tm[int(nint/2)])[1]*180./math.pi
+        #import pdb; pdb.set_trace()
+        el = target.azel(tm[int(nint/2)]).alt.to_value(u.deg)
+        #el=target.azel(tm[int(nint/2)])[1]*180./math.pi
         if el >= parms['minElev']:
             good_elevations.append(scan)
         else:   # Throw away scans at low elevation
